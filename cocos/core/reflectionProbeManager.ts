@@ -33,14 +33,14 @@ export class ReflectionProbeManager {
     public addProbe (camera: Camera, pos?: Vec3) {
         const probe = new ReflectionProbe();
 
-        probe.startCapture(camera, (data:any, width:any, height:any) => {
-            const path = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
-            const fileName = 'testRendercc.png';
-            const fullpath = path + fileName;
-            EditorExtends.Asset.saveDataToImage(data, width, height, fullpath, (params:any) => {
-            });
-        });
-        this._probes.push(probe);
+        // probe.startCapture(camera, (data:any, width:any, height:any) => {
+        //     const path = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
+        //     const fileName = 'testRendercc.png';
+        //     const fullpath = path + fileName;
+        //     EditorExtends.Asset.saveDataToImage(data, width, height, fullpath, (params:any) => {
+        //     });
+        // });
+        // this._probes.push(probe);
     }
     //eslint-disable-next-line @typescript-eslint/ban-types
     async waitForNextFrame (callback:Function) {
