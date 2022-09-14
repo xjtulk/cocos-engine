@@ -8,41 +8,25 @@ exports.update = update;
 
 const { setHidden, setDisabled, isMultipleInvalid } = require('../utils/prop');
 
+
 exports.ready = function() {
-    // Handling in-line displayed attributes
+    const $prop = document.createElement('ui-prop');
+    this.$.componentContainer.before($prop);
 
-    this.elements = {
-        generate: {
-            ready(element) {
-                const $checkbox = element.querySelector('ui-checkbox[slot="content"]');
+    const $label = document.createElement('ui-label');
+    $label.setAttribute('slot', 'label');
+    $label.value = 'Generate';
+    $prop.appendChild($label);
 
-                const $generate = document.createElement('ui-button');
-                $generate.setAttribute('style', `margin-right: ${MARGIN}`);
-                $generate.setAttribute('slot', 'content');
-                $generate.setAttribute('class', 'blue');
-                $generate.setAttribute('tooltip', 'i18n:ENGINE.components.reflection_probe.generate_tips');
-                const $generateLabel = document.createElement('ui-label');
-                $generateLabel.setAttribute('value', 'i18n:ENGINE.components.reflection_probe.generate');
-                $generate.appendChild($generateLabel);
-                $checkbox.after($generate);
+    const $button = document.createElement('ui-button');
+    $button.setAttribute('slot', 'content');
+    $button.setAttribute('class', 'blue');
+    $button.innerText = 'Bake';
+    $prop.appendChild($button);
 
-                // Hack: ui-button has extra events that are passed up to ui-prop ;
-                $generate.addEventListener('change', (event) => {
-                    console.log("change============");
-                    event.stopPropagation();
-                    Editor.Message.send('scene', 'snapshot');
-                });
-
-                $generate.addEventListener('confirm', async (event) => {
-                    console.log("confirm============");
-                    event.stopPropagation();
-
-                    Editor.Message.send('scene', 'snapshot');
-                });
-                this.$.generateButton = $generate;
-            },
-            update(element, dump) {
-            },
-        },
-    };
+    $button.addEventListener('confirm', async () => {
+        console.log('confirm================');
+    });
 };
+
+
