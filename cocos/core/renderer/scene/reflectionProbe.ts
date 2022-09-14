@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 /*
  Copyright (c) 2020 Xiamen Yaji Software Co., Ltd.
 
@@ -88,7 +89,6 @@ export const ProbeClearFlag = Enum({
 @executeInEditMode
 @playOnFocus
 export class ReflectionProbe extends Component {
-    // eslint-disable-next-line @typescript-eslint/ban-types
     private _camera: Camera | null = null;
     @serializable
     public _faces: IProbeFace = {};
@@ -131,6 +131,7 @@ export class ReflectionProbe extends Component {
     set generate (val) {
         this._generate = val;
         if (val) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.startCapture();
         }
     }
@@ -202,41 +203,6 @@ export class ReflectionProbe extends Component {
         return this._far;
     }
 
-    @type(CCInteger)
-    set cameraDir (val) {
-        this._dir = val;
-        // eslint-disable-next-line default-case
-        if (this._camera) {
-            if (val === 1) {
-                //top
-                this.node.setRotationFromEuler(new Vec3(90, 0, 0));
-                this._camera.update(true);
-            } else if (val === 2) {
-                //bottom
-                this.node.setRotationFromEuler(new Vec3(-90, 0, 0));
-                this._camera.update(true);
-            } else if (val === 3) {
-                //front
-                this.node.setRotationFromEuler(new Vec3(0, 0, 0));
-                this._camera.update(true);
-            } else if (val === 4) {
-                //back
-                this.node.setRotationFromEuler(new Vec3(0, -180, 0));
-                this._camera.update(true);
-            } else if (val === 5) {
-                //left
-                this.node.setRotationFromEuler(new Vec3(0, 90, 0));
-                this._camera.update(true);
-            }  else if (val === 6) {
-                //right
-                this.node.setRotationFromEuler(new Vec3(0, -90, 0));
-                this._camera.update(true);
-            }
-        }
-    }
-    get cameraDir () {
-        return this._dir;
-    }
     public onLoad () {
         this._createCamera();
     }
@@ -250,7 +216,7 @@ export class ReflectionProbe extends Component {
             this._camera = null;
         }
     }
-    public startCapture () {
+    public async startCapture () {
         // enum FaceIndex {
         //     right = 0,
         //     left = 1,
@@ -260,28 +226,25 @@ export class ReflectionProbe extends Component {
         //     back = 5,
         // }
         for (let i = 0; i < this._cameraDir.length; i++) {
-            const pos = this._cameraDir[i];
-            const width = this._size;
-            const height = this._size;
-            const rt = new RenderTexture();
-            rt.reset({ width, height });
-            if (rt) {
-                const window = rt.window;
-                this._camera!.changeTargetWindow(window);
-                this._camera!.setFixedSize(window!.width, window!.height);
-            }
-            // eslint-disable-next-line no-loop-func
-            director.once(Director.EVENT_END_FRAME, () => {
-                let pixelData = rt.readPixels();
-                rt.destroy();
-                pixelData = this.flipImage(pixelData, width, height);
-                const fileName = 'testRendercc.png';
-                const fullPath = this._fullPath + fileName;
-                EditorExtends.Asset.saveDataToImage(pixelData, width, height, fullPath, (params: any) => {
-                    console.log('save image success');
-                });
-            });
+            this._updateCameraDir(this._cameraDir[i]);
+            const rt = this._createTargetTexture();
+            this._resetTargetTexture(rt);
+            await this.waitForNextFrame();
+            let pixelData = rt.readPixels();
+            rt.destroy();
+            pixelData = this.flipImage(pixelData, this._size, this._size);
+            const fileName = `capture_${i}.png`;
+            const fullPath = this._fullPath + fileName;
+            await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {});
         }
+        this._updateCameraDir(new Vec3(0, 0, 0));
+    }
+    public async waitForNextFrame () {
+        return new Promise<void>((resolve, reject) => {
+            director.once(Director.EVENT_END_FRAME, () => {
+                resolve();
+            });
+        });
     }
 
     private _createCamera () {
@@ -326,9 +289,21 @@ export class ReflectionProbe extends Component {
         const rs = this._getRenderScene();
         rs.addCamera(this._camera);
     }
-    private _updateDir (pos: Vec3) {
+    private _updateCameraDir (pos: Vec3) {
         this.node.setRotationFromEuler(pos);
         this._camera!.update(true);
+    }
+    private _createTargetTexture () {
+        const width = this._size;
+        const height = this._size;
+        const rt = new RenderTexture();
+        rt.reset({ width, height });
+        return rt;
+    }
+    private _resetTargetTexture (rt:RenderTexture) {
+        const window = rt.window;
+        this._camera!.changeTargetWindow(window);
+        this._camera!.setFixedSize(window!.width, window!.height);
     }
     public flipImage (data:Uint8Array|null, width:number, height:number) {
         if (!data) {
