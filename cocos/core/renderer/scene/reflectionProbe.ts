@@ -23,7 +23,7 @@
  THE SOFTWARE.
  */
 import { EDITOR } from 'internal:constants';
-import { CCFloat, CCString, Color, Enum, Layers, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
+import { CCFloat, CCInteger, CCString, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { ClearFlag } from '../../components/camera-component';
 import { Component } from '../../components/component';
@@ -113,10 +113,22 @@ export class ReflectionProbe extends Component {
     @serializable
     protected _far = 1000;
 
+    @serializable
+    protected _dir = 0;
+
+    private _cameraDir: Vec3[] =
+    [
+        new Vec3(90, 0, 0),
+        new Vec3(-90, 0, 0),
+        new Vec3(0, 0, 0),
+        new Vec3(0, -180, 0),
+        new Vec3(0, 90, 0),
+        new Vec3(0, -90, 0),
+    ];
+
     //@readOnly
     @editable
     set generate (val) {
-        console.log(val);
         this._generate = val;
         if (val) {
             this.startCapture();
@@ -190,53 +202,89 @@ export class ReflectionProbe extends Component {
         return this._far;
     }
 
-    public startCapture () {
-        const ccTest = this.getComponent('cc.Camera');
-        console.log(ccTest.camera);
-        const camera = this._createCamera();
-        console.log(camera);
-        const width = this._size;
-        const height = this._size;
-        const rt = new RenderTexture();
-        rt.reset({ width, height });
-        if (rt) {
-            const window = rt.window;
-            camera.changeTargetWindow(window);
-            camera.setFixedSize(window!.width, window!.height);
+    @type(CCInteger)
+    set cameraDir (val) {
+        this._dir = val;
+        // eslint-disable-next-line default-case
+        if (this._camera) {
+            if (val === 1) {
+                //top
+                this.node.setRotationFromEuler(new Vec3(90, 0, 0));
+                this._camera.update(true);
+            } else if (val === 2) {
+                //bottom
+                this.node.setRotationFromEuler(new Vec3(-90, 0, 0));
+                this._camera.update(true);
+            } else if (val === 3) {
+                //front
+                this.node.setRotationFromEuler(new Vec3(0, 0, 0));
+                this._camera.update(true);
+            } else if (val === 4) {
+                //back
+                this.node.setRotationFromEuler(new Vec3(0, -180, 0));
+                this._camera.update(true);
+            } else if (val === 5) {
+                //left
+                this.node.setRotationFromEuler(new Vec3(0, 90, 0));
+                this._camera.update(true);
+            }  else if (val === 6) {
+                //right
+                this.node.setRotationFromEuler(new Vec3(0, -90, 0));
+                this._camera.update(true);
+            }
         }
-        director.once(Director.EVENT_END_FRAME, () => {
-            let pixelData = rt.readPixels();
-            pixelData = this.flipImageX(pixelData, width, height);
-            EditorExtends.Asset.saveDataToImage(pixelData, width, height, this._fullPath, (params:any) => {
-            });
-            //callback(pixelData, width, height, pixelData);
-        });
+    }
+    get cameraDir () {
+        return this._dir;
+    }
+    public onLoad () {
+        this._createCamera();
     }
 
-    public startCaptureTest () {
-        const camera = this.getComponent('cc.Camera');
-        console.log(camera);
-        const width = this._size;
-        const height = this._size;
-        const rt = new RenderTexture();
-        rt.reset({ width, height });
-
-        if (rt) {
-            camera.targetTexture = rt;
-        }
-        director.once(Director.EVENT_END_FRAME, () => {
-            const pixelData = rt.readPixels();
-            EditorExtends.Asset.saveDataToImage(pixelData, width, height, this._fullPath, (params:any) => {
-            });
-            //callback(pixelData, width, height, pixelData);
-        });
+    public onEnable () {
+        this._attachToScene();
     }
-
-    public _createCamera () {
+    public onDestroy () {
         if (this._camera) {
             this._camera.destroy();
             this._camera = null;
         }
+    }
+    public startCapture () {
+        // enum FaceIndex {
+        //     right = 0,
+        //     left = 1,
+        //     top = 2,
+        //     bottom = 3,
+        //     front = 4,
+        //     back = 5,
+        // }
+        for (let i = 0; i < this._cameraDir.length; i++) {
+            const pos = this._cameraDir[i];
+            const width = this._size;
+            const height = this._size;
+            const rt = new RenderTexture();
+            rt.reset({ width, height });
+            if (rt) {
+                const window = rt.window;
+                this._camera!.changeTargetWindow(window);
+                this._camera!.setFixedSize(window!.width, window!.height);
+            }
+            // eslint-disable-next-line no-loop-func
+            director.once(Director.EVENT_END_FRAME, () => {
+                let pixelData = rt.readPixels();
+                rt.destroy();
+                pixelData = this.flipImage(pixelData, width, height);
+                const fileName = 'testRendercc.png';
+                const fullPath = this._fullPath + fileName;
+                EditorExtends.Asset.saveDataToImage(pixelData, width, height, fullPath, (params: any) => {
+                    console.log('save image success');
+                });
+            });
+        }
+    }
+
+    private _createCamera () {
         if (!this._camera) {
             this._camera = (legacyCC.director.root as Root).createCamera();
             this._camera.initialize({
@@ -248,29 +296,27 @@ export class ReflectionProbe extends Component {
                 cameraType: CameraType.DEFAULT,
                 trackingType: TrackingType.NO_TRACKING,
             });
-            this._camera.setViewportInOrientedSpace(new Rect(0, 0, 1, 1));
-            this._camera.fovAxis = CameraFOVAxis.VERTICAL;
-            this._camera.fov = toRadian(45);
-            this._camera.orthoHeight = 10;
-            this._camera.nearClip = this._near;
-            this._camera.farClip = this._far;
-            this._camera.clearColor = this._backgroundColor;
-            this._camera.clearDepth = 1.0;
-            this._camera.clearStencil = 0.0;
-            this._camera.clearFlag = this._clearFlag;
-            this._camera.visibility = this._visibility;
-            this._camera.aperture = CameraAperture.F16_0;
-            this._camera.shutter = CameraShutter.D125;
-            this._camera.iso = CameraISO.ISO100;
         }
+        this._camera.setViewportInOrientedSpace(new Rect(0, 0, 1, 1));
+        this._camera.fovAxis = CameraFOVAxis.VERTICAL;
+        this._camera.fov = toRadian(45);
+        this._camera.orthoHeight = 10;
+        this._camera.nearClip = this._near;
+        this._camera.farClip = this._far;
+        this._camera.clearColor = this._backgroundColor;
+        this._camera.clearDepth = 1.0;
+        this._camera.clearStencil = 0.0;
+        this._camera.clearFlag = this._clearFlag;
+        this._camera.visibility = this._visibility;
+        this._camera.aperture = CameraAperture.F16_0;
+        this._camera.shutter = CameraShutter.D125;
+        this._camera.iso = CameraISO.ISO100;
         this._camera.position = this.node.position;
-        // this._camera.enabled = true;
-        // this._camera.isWindowSize = true;
-        // this._camera.forward = Vec3.FORWARD;
-        this._attachToScene();
+        this._camera.enabled = true;
+        this._camera.update(true);
         return this._camera;
     }
-    protected _attachToScene () {
+    private _attachToScene () {
         if (!this.node.scene || !this._camera) {
             return;
         }
@@ -280,25 +326,11 @@ export class ReflectionProbe extends Component {
         const rs = this._getRenderScene();
         rs.addCamera(this._camera);
     }
-    public setTargetTexture (rt:RenderTexture) {
-        this._updateTargetTexture(rt);
-
-        if (!rt && this._camera) {
-            this._camera.changeTargetWindow(EDITOR ? legacyCC.director.root.tempWindow : null);
-            this._camera.isWindowSize = true;
-        }
+    private _updateDir (pos: Vec3) {
+        this.node.setRotationFromEuler(pos);
+        this._camera!.update(true);
     }
-    protected _updateTargetTexture (rt:RenderTexture) {
-        if (!this._camera) {
-            return;
-        }
-        if (rt) {
-            const window = rt.window;
-            this._camera.changeTargetWindow(window);
-            this._camera.setFixedSize(window!.width, window!.height);
-        }
-    }
-    public flipImageX (data:Uint8Array|null, width:number, height:number) {
+    public flipImage (data:Uint8Array|null, width:number, height:number) {
         if (!data) {
             return null;
         }
