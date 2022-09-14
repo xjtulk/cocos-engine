@@ -36,14 +36,6 @@ import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
 
-interface IProbeFace {
-    front?: Texture2D;
-    back?: Texture2D;
-    left?: Texture2D;
-    right?: Texture2D;
-    top?: Texture2D;
-    bottom?: Texture2D;
-}
 export const ProbeResolution = Enum({
     /**
      * @zh 分辨率 128 * 128。
@@ -83,19 +75,17 @@ export const ProbeClearFlag = Enum({
     SKYBOX: SKYBOX_FLAG | ClearFlagBit.DEPTH_STENCIL,
     SOLID_COLOR: ClearFlagBit.ALL,
 });
+export const ProbeType = Enum({
+    BAKE: 0,
+    REALTIME: 1,
+});
 @ccclass('cc.ReflectionProbe')
-@help('i18n:cc.ReflectionProbe')
-@menu('Mesh/ReflectionProbe')
+@menu('Rendering/ReflectionProbe')
 @executeInEditMode
 @playOnFocus
 export class ReflectionProbe extends Component {
-    private _camera: Camera | null = null;
-    @serializable
-    public _faces: IProbeFace = {};
     @serializable
     protected _generate = false;
-    @serializable
-    protected _fullPath = '';
 
     @serializable
     protected _size = 1024;
@@ -114,7 +104,7 @@ export class ReflectionProbe extends Component {
     protected _far = 1000;
 
     @serializable
-    protected _dir = 0;
+    protected _probeType = ProbeType.BAKE;
 
     private _cameraDir: Vec3[] =
     [
@@ -125,8 +115,17 @@ export class ReflectionProbe extends Component {
         new Vec3(0, 90, 0),
         new Vec3(0, -90, 0),
     ];
+    private _camera: Camera | null = null;
 
-    //@readOnly
+    private _fullPath = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
+
+    @type(ProbeType)
+    set probeType (value: number) {
+        this._probeType = value;
+    }
+    get probeType () {
+        return this._probeType;
+    }
     @editable
     set generate (val) {
         this._generate = val;
@@ -137,13 +136,6 @@ export class ReflectionProbe extends Component {
     }
     get generate () {
         return this._generate;
-    }
-    @type(CCString)
-    set filePath (path: string) {
-        this._fullPath = path;
-    }
-    get filePath () {
-        return this._fullPath;
     }
 
     /**
@@ -160,6 +152,7 @@ export class ReflectionProbe extends Component {
     @type(ProbeClearFlag)
     set clearFlag (value: number) {
         this._clearFlag = value;
+        this._camera!.clearFlag = this._clearFlag;
     }
     get clearFlag () {
         return this._clearFlag;
@@ -190,6 +183,7 @@ export class ReflectionProbe extends Component {
     @type(CCFloat)
     set near (val) {
         this._near = val;
+        this._camera!.nearClip = this._near;
     }
     get near () {
         return this._near;
@@ -198,9 +192,14 @@ export class ReflectionProbe extends Component {
     @type(CCFloat)
     set far (val) {
         this._far = val;
+        this._camera!.farClip = this._far;
     }
     get far () {
         return this._far;
+    }
+
+    public start () {
+
     }
 
     public onLoad () {
