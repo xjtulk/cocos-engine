@@ -23,12 +23,10 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-import { ccclass } from 'cc.decorator';
-import { CCFloat, CCInteger, CCString, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
+import { CCFloat, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
-import { ClearFlag } from '../../components/camera-component';
 import { Component } from '../../components/component';
-import { editable, executeInEditMode, help, menu, playOnFocus, serializable, tooltip, type, visible } from '../../data/decorators';
+import { ccclass, editable, executeInEditMode, menu, playOnFocus, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
 import { ClearFlagBit } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
@@ -225,8 +223,6 @@ export class ReflectionProbe extends Component {
         // }
         for (let i = 0; i < this._cameraDir.length; i++) {
             this._updateCameraDir(this._cameraDir[i]);
-            // this._camera!.forward = this._cameraDir[i];
-            // this._camera?.update(true);
             const rt = this._createTargetTexture();
             this._resetTargetTexture(rt);
             await this.waitForNextFrame();

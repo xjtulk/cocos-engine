@@ -212,7 +212,7 @@ export class ReflectionProbeVolume {
             0.1,  this._shadowCameraFar, _matShadowTrans);
     }
 }
-export class ReflectionProbeLayer extends ReflectionProbeVolume {
+export class ReflectionProbeFace extends ReflectionProbeVolume {
     protected _splitCameraNear = 0;
     protected _splitCameraFar = 0;
 
@@ -260,11 +260,11 @@ export class ReflectionProbeLayer extends ReflectionProbeVolume {
  * @en Shadow CSM layer manager
  * @zh CSM阴影图层管理
  */
-export class ReflectionProbeLayers {
+export class ReflectionProbeFaces {
     protected _castShadowObjects: IRenderObject[] = [];
     protected _layerObjects = new CachedArray<IRenderObject>(64);
 
-    protected _layers: ReflectionProbeLayer[] = [];
+    protected _layers: ReflectionProbeFace[] = [];
     // LevelCount is a scalar, Indicates the number.
     protected _levelCount = 0;
     // The ShadowTransformInfo object for 'fixed area shadow' || 'maximum clipping info' || 'CSM layers = 1'.
@@ -288,8 +288,8 @@ export class ReflectionProbeLayers {
     }
 
     public constructor () {
-        for (let i = 0; i < CSMLevel.LEVEL_4; i++) {
-            this._layers[i] = new ReflectionProbeLayer(i);
+        for (let i = 0; i < 6; i++) {
+            this._layers[i] = new ReflectionProbeFace(i);
         }
     }
 

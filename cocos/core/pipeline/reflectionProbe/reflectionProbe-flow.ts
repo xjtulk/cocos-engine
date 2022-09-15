@@ -23,7 +23,6 @@
  THE SOFTWARE.
  */
 
-import { ccclass } from 'cc.decorator';
 import { PIPELINE_FLOW_SHADOW, supportsR32FloatTexture, UBOCamera, UBOCSM, UBOGlobal, UBOShadow } from '../define';
 import { IRenderFlowInfo, RenderFlow } from '../render-flow';
 import { ForwardFlowPriority } from '../enum';
@@ -39,6 +38,7 @@ import { PCFType, ShadowType } from '../../renderer/scene/shadows';
 import { Light, LightType } from '../../renderer/scene/light';
 import { Camera } from '../../renderer/scene';
 import { SpotLight } from '../../renderer/scene/spot-light';
+import { ccclass } from '../../data/decorators';
 
 const _validLights: Light[] = [];
 
@@ -74,61 +74,15 @@ export class ReflectionProbeFlow extends RenderFlow {
 
     public activate (pipeline: RenderPipeline) {
         super.activate(pipeline);
-
-        // 0: SHADOWMAP_FLOAT, 1: SHADOWMAP_RGBE.
-        const isRGBE = supportsR32FloatTexture(pipeline.device) ? 0 : 1;
-        pipeline.macros.CC_SHADOWMAP_FORMAT = isRGBE;
-
-        // 0: SHADOWMAP_LINER_DEPTH_OFF, 1: SHADOWMAP_LINER_DEPTH_ON.
-        const isLinear = pipeline.device.gfxAPI === API.WEBGL ? 1 : 0;
-        pipeline.macros.CC_SHADOWMAP_USE_LINEAR_DEPTH = isLinear;
-
-        // 0: UNIFORM_VECTORS_LESS_EQUAL_64, 1: UNIFORM_VECTORS_GREATER_EQUAL_125.
-        pipeline.pipelineSceneData.csmSupported = pipeline.device.capabilities.maxFragmentUniformVectors
-            >= (UBOGlobal.COUNT + UBOCamera.COUNT + UBOShadow.COUNT + UBOCSM.COUNT) / 4;
-        pipeline.macros.CC_SUPPORT_CASCADED_SHADOW_MAP = pipeline.pipelineSceneData.csmSupported;
-
-        // 0: CC_SHADOW_NONE, 1: CC_SHADOW_PLANAR, 2: CC_SHADOW_MAP
-        pipeline.macros.CC_SHADOW_TYPE = 0;
-
-        // 0: PCFType.HARD, 1: PCFType.SOFT, 2: PCFType.SOFT_2X, 3: PCFType.SOFT_4X
-        pipeline.macros.CC_DIR_SHADOW_PCF_TYPE = PCFType.HARD;
-
-        // 0: CC_DIR_LIGHT_SHADOW_NONE, 1: CC_DIR_LIGHT_SHADOW_UNIFORM, 2: CC_DIR_LIGHT_SHADOW_CASCADED, 3: CC_DIR_LIGHT_SHADOW_VARIANCE
-        pipeline.macros.CC_DIR_LIGHT_SHADOW_TYPE = 0;
-
         pipeline.onGlobalPipelineStateChanged();
     }
 
     public render (camera: Camera) {
         const pipeline = this._pipeline as ForwardPipeline;
-        const shadowInfo = pipeline.pipelineSceneData.shadows;
         const csmLayers = pipeline.pipelineSceneData.csmLayers;
         const shadowFrameBufferMap = pipeline.pipelineSceneData.shadowFrameBufferMap;
         const castShadowObjects = csmLayers.castShadowObjects;
         const validPunctualLights = this._pipeline.pipelineSceneData.validPunctualLights;
-        if (!shadowInfo.enabled || shadowInfo.type !== ShadowType.ShadowMap) { return; }
-
-        let n = 0;
-        let m = 0;
-        for (;n < shadowInfo.maxReceived && m < validPunctualLights.length;) {
-            const light = validPunctualLights[m];
-            if (light.type === LightType.SPOT) {
-                const spotLight = light as SpotLight;
-                if (spotLight.shadowEnabled) {
-                    _validLights.push(light);
-                    n++;
-                }
-            }
-            m++;
-        }
-
-        if (castShadowObjects.length === 0) {
-            this.clearShadowMap(_validLights, camera);
-            return;
-        }
-
-        if (shadowInfo.shadowMapDirty) { this.resizeShadowMap(); }
 
         const { mainLight } = camera.scene!;
         if (mainLight && mainLight.shadowEnabled) {

@@ -23,7 +23,6 @@
  THE SOFTWARE.
  */
 
-import { ccclass } from 'cc.decorator';
 import { Color, Rect, Framebuffer, DescriptorSet } from '../../gfx';
 import { IRenderStageInfo, RenderStage } from '../render-stage';
 import { ForwardStagePriority } from '../enum';
@@ -33,6 +32,7 @@ import { SetIndex } from '../define';
 import { Light, LightType } from '../../renderer/scene/light';
 import { ReflectionProbeFlow } from './reflectionProbe-flow';
 import { Camera, CSMLevel, DirectionalLight } from '../../renderer/scene';
+import { ccclass } from '../../data/decorators';
 
 const colors: Color[] = [new Color(1, 1, 1, 1)];
 
