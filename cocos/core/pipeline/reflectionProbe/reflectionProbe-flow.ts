@@ -27,7 +27,7 @@ import { ccclass } from 'cc.decorator';
 import { PIPELINE_FLOW_SHADOW, supportsR32FloatTexture, UBOCamera, UBOCSM, UBOGlobal, UBOShadow } from '../define';
 import { IRenderFlowInfo, RenderFlow } from '../render-flow';
 import { ForwardFlowPriority } from '../enum';
-import { ShadowStage } from './reflectionProbe-stage';
+import { ReflectionProbeStage } from './reflectionProbe-stage';
 import { RenderPass, LoadOp, StoreOp,
     Format, Texture, TextureType, TextureUsageBit, ColorAttachment,
     DepthStencilAttachment, RenderPassInfo, TextureInfo, FramebufferInfo, Swapchain,
@@ -65,8 +65,8 @@ export class ReflectionProbeFlow extends RenderFlow {
         super.initialize(info);
         if (this._stages.length === 0) {
             // add shadowMap-stages
-            const shadowMapStage = new ShadowStage();
-            shadowMapStage.initialize(ShadowStage.initInfo);
+            const shadowMapStage = new ReflectionProbeStage();
+            shadowMapStage.initialize(ReflectionProbeStage.initInfo);
             this._stages.push(shadowMapStage);
         }
         return true;
@@ -249,7 +249,7 @@ export class ReflectionProbeFlow extends RenderFlow {
 
     private _renderStage (camera: Camera, light: Light, shadowFrameBuffer: Framebuffer, globalDS: DescriptorSet, level = 0) {
         for (let i = 0; i < this._stages.length; i++) {
-            const shadowStage = this._stages[i] as ShadowStage;
+            const shadowStage = this._stages[i] as ReflectionProbeStage;
             shadowStage.setUsage(globalDS, light, shadowFrameBuffer, level);
             shadowStage.render(camera);
         }
@@ -268,7 +268,7 @@ export class ReflectionProbeFlow extends RenderFlow {
 
             const shadowFrameBuffer = scene.shadowFrameBufferMap.get(mainLight);
             for (let i = 0; i < this._stages.length; i++) {
-                const shadowStage = this._stages[i] as ShadowStage;
+                const shadowStage = this._stages[i] as ReflectionProbeStage;
                 shadowStage.setUsage(globalDS, mainLight, shadowFrameBuffer!);
                 shadowStage.clearFramebuffer(camera);
             }
@@ -283,7 +283,7 @@ export class ReflectionProbeFlow extends RenderFlow {
 
             const shadowFrameBuffer = scene.shadowFrameBufferMap.get(light);
             for (let i = 0; i < this._stages.length; i++) {
-                const shadowStage = this._stages[i] as ShadowStage;
+                const shadowStage = this._stages[i] as ReflectionProbeStage;
                 shadowStage.setUsage(ds, light, shadowFrameBuffer!);
                 shadowStage.clearFramebuffer(camera);
             }

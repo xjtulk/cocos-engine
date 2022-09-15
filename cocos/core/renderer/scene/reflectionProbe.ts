@@ -23,13 +23,12 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-import { EDITOR } from 'internal:constants';
+import { ccclass } from 'cc.decorator';
 import { CCFloat, CCInteger, CCString, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { ClearFlag } from '../../components/camera-component';
 import { Component } from '../../components/component';
 import { editable, executeInEditMode, help, menu, playOnFocus, serializable, tooltip, type, visible } from '../../data/decorators';
-import { ccclass } from '../../data/decorators/ccclass';
 import { Director, director } from '../../director';
 import { ClearFlagBit } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
