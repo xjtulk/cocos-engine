@@ -34,17 +34,13 @@ import { RenderPass, LoadOp, StoreOp,
 import { RenderFlowTag } from '../pipeline-serialization';
 import { ForwardPipeline } from '../forward/forward-pipeline';
 import { RenderPipeline } from '..';
-import { PCFType, ShadowType } from '../../renderer/scene/shadows';
-import { Light, LightType } from '../../renderer/scene/light';
+import { Light } from '../../renderer/scene/light';
 import { Camera } from '../../renderer/scene';
-import { SpotLight } from '../../renderer/scene/spot-light';
 import { ccclass } from '../../data/decorators';
 
-const _validLights: Light[] = [];
-
 /**
- * @en Shadow map render flow
- * @zh 阴影贴图绘制流程
+ * @en ReflectionProbe render flow
+ * @zh 反射探针RenderTexture绘制流程
  */
 @ccclass('ReflectionProbeFlow')
 export class ReflectionProbeFlow extends RenderFlow {
@@ -79,10 +75,7 @@ export class ReflectionProbeFlow extends RenderFlow {
 
     public render (camera: Camera) {
         const pipeline = this._pipeline as ForwardPipeline;
-        const csmLayers = pipeline.pipelineSceneData.csmLayers;
         const shadowFrameBufferMap = pipeline.pipelineSceneData.shadowFrameBufferMap;
-        const castShadowObjects = csmLayers.castShadowObjects;
-        const validPunctualLights = this._pipeline.pipelineSceneData.validPunctualLights;
 
         const { mainLight } = camera.scene!;
         if (mainLight && mainLight.shadowEnabled) {
@@ -95,26 +88,11 @@ export class ReflectionProbeFlow extends RenderFlow {
             if (mainLight.shadowFixedArea) {
                 this._renderStage(camera, mainLight, shadowFrameBuffer!, globalDS);
             } else {
-                const csmLevel = pipeline.pipelineSceneData.csmSupported ? mainLight.csmLevel : 1;
-                for (let i = 0; i < csmLevel; i++) {
+                for (let i = 0; i < 6; i++) {
                     this._renderStage(camera, mainLight, shadowFrameBuffer!, globalDS, i);
                 }
             }
         }
-
-        for (let l = 0; l < _validLights.length; l++) {
-            const light = _validLights[l];
-            const ds = pipeline.globalDSManager.getOrCreateDescriptorSet(light)!;
-
-            if (!shadowFrameBufferMap.has(light)) {
-                this._initShadowFrameBuffer(pipeline, light, camera.window.swapchain);
-            }
-
-            const shadowFrameBuffer = shadowFrameBufferMap.get(light);
-            this._renderStage(camera, light, shadowFrameBuffer!, ds);
-        }
-
-        _validLights.length = 0;
     }
 
     public destroy () {

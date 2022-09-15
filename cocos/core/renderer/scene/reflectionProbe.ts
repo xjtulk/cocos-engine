@@ -23,6 +23,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+import { EDITOR } from 'internal:constants';
 import { CCFloat, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
@@ -32,6 +33,7 @@ import { ClearFlagBit } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
+import { ReflectionProbeFlow } from '../../pipeline/reflectionProbe/reflectionProbe-flow';
 
 export const ProbeResolution = Enum({
     /**

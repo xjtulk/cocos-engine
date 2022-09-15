@@ -47,7 +47,7 @@ export class ReflectionProbeStage extends RenderStage {
      * @zh 一个通用的 ShadowStage 的初始化信息对象
      */
     public static initInfo: IRenderStageInfo = {
-        name: 'ShadowStage',
+        name: 'ReflectionProbeStage',
         priority: ForwardStagePriority.FORWARD,
         tag: 0,
     };
