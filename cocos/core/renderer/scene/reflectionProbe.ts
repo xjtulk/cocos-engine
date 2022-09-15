@@ -126,6 +126,7 @@ export class ReflectionProbe extends Component {
     get probeType () {
         return this._probeType;
     }
+    @visible(false)
     @editable
     set generate (val) {
         this._generate = val;
@@ -199,7 +200,6 @@ export class ReflectionProbe extends Component {
     }
 
     public start () {
-
     }
 
     public onLoad () {
@@ -226,6 +226,8 @@ export class ReflectionProbe extends Component {
         // }
         for (let i = 0; i < this._cameraDir.length; i++) {
             this._updateCameraDir(this._cameraDir[i]);
+            // this._camera!.forward = this._cameraDir[i];
+            // this._camera?.update(true);
             const rt = this._createTargetTexture();
             this._resetTargetTexture(rt);
             await this.waitForNextFrame();

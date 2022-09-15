@@ -6,9 +6,6 @@ exports.template = template;
 exports.$ = $;
 exports.update = update;
 
-const { setHidden, setDisabled, isMultipleInvalid } = require('../utils/prop');
-
-
 exports.ready = function() {
     const $prop = document.createElement('ui-prop');
     this.$.componentContainer.before($prop);
@@ -25,7 +22,8 @@ exports.ready = function() {
     $prop.appendChild($button);
 
     $button.addEventListener('confirm', async () => {
-        console.log('confirm================');
+        this.dump.value['generate']['value'] = true;
+        this.$this.dispatch('change-dump');
     });
 };
 
