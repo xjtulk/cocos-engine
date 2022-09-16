@@ -22,8 +22,7 @@ exports.ready = function() {
     $prop.appendChild($button);
 
     $button.addEventListener('confirm', async () => {
-        this.dump.value['generate']['value'] = true;
-        this.$this.dispatch('change-dump');
+        this.$.generate.dispatch('change-dump');
     });
 };
 

@@ -24,10 +24,10 @@
  THE SOFTWARE.
  */
 import { EDITOR } from 'internal:constants';
-import { CCFloat, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
-import { ccclass, editable, executeInEditMode, menu, playOnFocus, serializable, tooltip, type, visible } from '../../data/decorators';
+import { ccclass, editable, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
 import { ClearFlagBit } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
@@ -118,16 +118,10 @@ export class ReflectionProbe extends Component {
 
     private _fullPath = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
 
-    @type(ProbeType)
-    set probeType (value: number) {
-        this._probeType = value;
-    }
-    get probeType () {
-        return this._probeType;
-    }
-    @visible(false)
-    @editable
+    @readOnly
+    @type(CCBoolean)
     set generate (val) {
+        console.log(`generate=====${val}`);
         this._generate = val;
         if (val) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -138,12 +132,20 @@ export class ReflectionProbe extends Component {
         return this._generate;
     }
 
+    @type(ProbeType)
+    set probeType (value: number) {
+        this._probeType = value;
+    }
+    get probeType () {
+        return this._probeType;
+    }
     /**
      * @en set texture size
      * @zh 设置纹理大小
      */
     @type(ProbeResolution)
     set resolution (value: number) {
+        console.log(`resolution = ${value}`);
         this._size = value;
     }
     get resolution () {
@@ -233,7 +235,7 @@ export class ReflectionProbe extends Component {
             pixelData = this.flipImage(pixelData, this._size, this._size);
             const fileName = `capture_${i}.png`;
             const fullPath = this._fullPath + fileName;
-            await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {});
+            EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {});
         }
         this._updateCameraDir(new Vec3(0, 0, 0));
     }
