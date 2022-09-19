@@ -22,35 +22,17 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-import { Camera } from './components/camera-component';
-import { Director, director } from './director';
-import { Vec3 } from './math';
 import { ReflectionProbe } from './renderer/scene/reflectionProbe';
 
 export class ReflectionProbeManager {
     public static probeManager: ReflectionProbeManager | null = null;
-    private _probes: ReflectionProbe[] = [];
-    public addProbe (camera: Camera, pos?: Vec3) {
-        const probe = new ReflectionProbe();
 
-        // probe.startCapture(camera, (data:any, width:any, height:any) => {
-        //     const path = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
-        //     const fileName = 'testRendercc.png';
-        //     const fullpath = path + fileName;
-        //     EditorExtends.Asset.saveDataToImage(data, width, height, fullpath, (params:any) => {
-        //     });
-        // });
-        // this._probes.push(probe);
+    private _probes: ReflectionProbe[] = [];
+    public addProbe (probe: ReflectionProbe) {
+        this._probes.push(probe);
     }
-    //eslint-disable-next-line @typescript-eslint/ban-types
-    async waitForNextFrame (callback:Function) {
-        return new Promise<void>((resolve, reject) => {
-            director.once(Director.EVENT_END_FRAME, () => {
-                resolve();
-                callback();
-                console.log('end capture ==============');
-            });
-        });
+    public getReflectionProbes (): ReflectionProbe[] {
+        return this._probes;
     }
 }
 

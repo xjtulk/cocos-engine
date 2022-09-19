@@ -26,12 +26,10 @@
 import { Color, Rect, Framebuffer, DescriptorSet } from '../../gfx';
 import { IRenderStageInfo, RenderStage } from '../render-stage';
 import { ForwardStagePriority } from '../enum';
-import { RenderShadowMapBatchedQueue } from '../render-shadow-map-batched-queue';
 import { ForwardPipeline } from '../forward/forward-pipeline';
 import { SetIndex } from '../define';
-import { Light, LightType } from '../../renderer/scene/light';
 import { ReflectionProbeFlow } from './reflectionProbe-flow';
-import { Camera, CSMLevel, DirectionalLight } from '../../renderer/scene';
+import { Camera } from '../../renderer/scene';
 import { ccclass } from '../../data/decorators';
 
 const colors: Color[] = [new Color(1, 1, 1, 1)];
@@ -59,30 +57,22 @@ export class ReflectionProbeStage extends RenderStage {
      * @param shadowFrameBuffer
      * @param level 层级
      */
-    public setUsage (globalDS: DescriptorSet, light: Light, shadowFrameBuffer: Framebuffer, level = 0) {
+    public setUsage (globalDS: DescriptorSet, frameBuffer:Framebuffer) {
         this._globalDS = globalDS;
-        this._light = light;
-        this._shadowFrameBuffer = shadowFrameBuffer;
-        this._level = level;
+        this._frameBuffer = frameBuffer;
     }
 
-    private _additiveShadowQueue!: RenderShadowMapBatchedQueue;
-    private _shadowFrameBuffer: Framebuffer | null = null;
+    private _frameBuffer: Framebuffer | null = null;
     private _renderArea = new Rect();
-    private _light: Light | null = null;
     private _globalDS: DescriptorSet | null = null;
-    private _level = 0;
 
     public destroy () {
-        this._shadowFrameBuffer = null;
+        this._frameBuffer = null;
         this._globalDS = null;
-        this._light = null;
-
-        this._additiveShadowQueue?.clear();
     }
 
     public clearFramebuffer (camera: Camera) {
-        if (!this._light || !this._shadowFrameBuffer) { return; }
+        if (!this._frameBuffer) { return; }
 
         colors[0].w = camera.clearColor.w;
         const pipeline = this._pipeline as ForwardPipeline;
@@ -96,9 +86,9 @@ export class ReflectionProbeStage extends RenderStage {
         this._renderArea.width =  vp.width * shadowMapSize.x * shadingScale;
         this._renderArea.height = vp.height * shadowMapSize.y * shadingScale;
         const cmdBuff = pipeline.commandBuffers[0];
-        const renderPass = this._shadowFrameBuffer.renderPass;
+        const renderPass = this._frameBuffer.renderPass;
 
-        cmdBuff.beginRenderPass(renderPass, this._shadowFrameBuffer, this._renderArea,
+        cmdBuff.beginRenderPass(renderPass, this._frameBuffer, this._renderArea,
             colors, camera.clearDepth, camera.clearStencil);
         cmdBuff.endRenderPass();
     }
@@ -106,56 +96,25 @@ export class ReflectionProbeStage extends RenderStage {
     public render (camera: Camera) {
         const pipeline = this._pipeline;
         const pipelineSceneData = pipeline.pipelineSceneData;
-        const shadowInfo = pipelineSceneData.shadows;
         const descriptorSet = this._globalDS!;
         const cmdBuff = pipeline.commandBuffers[0];
-        const level = this._level;
 
-        if (!this._light || !this._shadowFrameBuffer) { return; }
-        this._pipeline.pipelineUBO.updateShadowUBOLight(descriptorSet, this._light, level);
-        this._additiveShadowQueue.gatherLightPasses(camera, this._light, cmdBuff, level);
-
-        const shadowMapSize = shadowInfo.size;
-        switch (this._light.type) {
-        case LightType.DIRECTIONAL: {
-            const mainLight = this._light as DirectionalLight;
-            if (mainLight.shadowFixedArea || mainLight.csmLevel === CSMLevel.LEVEL_1 || !pipelineSceneData.csmSupported) {
-                this._renderArea.x = 0;
-                this._renderArea.y = 0;
-                this._renderArea.width = shadowMapSize.x;
-                this._renderArea.height = shadowMapSize.y;
-            } else {
-                this._renderArea.x = level % 2 * 0.5 * shadowMapSize.x;
-                this._renderArea.y = (1 - Math.floor(level / 2)) * 0.5 * shadowMapSize.y;
-                this._renderArea.width = 0.5 * shadowMapSize.x;
-                this._renderArea.height = 0.5 * shadowMapSize.y;
-            }
-            break;
-        }
-        case LightType.SPOT: {
-            this._renderArea.x = 0;
-            this._renderArea.y = 0;
-            this._renderArea.width = shadowMapSize.x;
-            this._renderArea.height = shadowMapSize.y;
-            break;
-        }
-        default:
-        }
+        this._renderArea.x = 0;
+        this._renderArea.y = 0;
+        this._renderArea.width = 512;
+        this._renderArea.height = 512;
 
         const device = pipeline.device;
-        const renderPass = this._shadowFrameBuffer.renderPass;
+        const renderPass = this._frameBuffer!.renderPass;
 
-        cmdBuff.beginRenderPass(renderPass, this._shadowFrameBuffer, this._renderArea,
+        cmdBuff.beginRenderPass(renderPass, this._frameBuffer!, this._renderArea,
             colors, camera.clearDepth, camera.clearStencil);
         cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, descriptorSet);
-
-        this._additiveShadowQueue.recordCommandBuffer(device, renderPass, cmdBuff);
 
         cmdBuff.endRenderPass();
     }
 
     public activate (pipeline: ForwardPipeline, flow: ReflectionProbeFlow) {
         super.activate(pipeline, flow);
-        this._additiveShadowQueue = new RenderShadowMapBatchedQueue(pipeline);
     }
 }

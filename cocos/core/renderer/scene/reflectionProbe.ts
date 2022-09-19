@@ -1,4 +1,3 @@
-/* eslint-disable no-await-in-loop */
 /*
  Copyright (c) 2020 Xiamen Yaji Software Co., Ltd.
 
@@ -23,8 +22,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-import { EDITOR } from 'internal:constants';
-import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, Root, Texture2D, toRadian, Vec3 } from '../..';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, ReflectionProbeManager, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { ccclass, editable, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
@@ -33,7 +31,6 @@ import { ClearFlagBit } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
-import { ReflectionProbeFlow } from '../../pipeline/reflectionProbe/reflectionProbe-flow';
 
 export const ProbeResolution = Enum({
     /**
@@ -105,6 +102,9 @@ export class ReflectionProbe extends Component {
     @serializable
     protected _probeType = ProbeType.BAKE;
 
+    @serializable
+    protected _fov = 45;
+
     private _cameraDir: Vec3[] =
     [
         new Vec3(90, 0, 0),
@@ -115,6 +115,8 @@ export class ReflectionProbe extends Component {
         new Vec3(0, -90, 0),
     ];
     private _camera: Camera | null = null;
+
+    //private _captureFace: RenderTexture[] = [];
 
     private _fullPath = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
 
@@ -183,6 +185,15 @@ export class ReflectionProbe extends Component {
     }
 
     @type(CCFloat)
+    set fov (val) {
+        this._fov = val;
+        this._camera!.fov = toRadian(this._fov);
+    }
+    get fov () {
+        return this._fov;
+    }
+
+    @type(CCFloat)
     set near (val) {
         this._near = val;
         this._camera!.nearClip = this._near;
@@ -199,11 +210,12 @@ export class ReflectionProbe extends Component {
     get far () {
         return this._far;
     }
-
-    public start () {
+    get camera () {
+        return this._camera;
     }
 
     public onLoad () {
+        ReflectionProbeManager.probeManager?.addProbe(this);
         this._createCamera();
     }
 
@@ -216,6 +228,7 @@ export class ReflectionProbe extends Component {
             this._camera = null;
         }
     }
+    /* eslint-disable no-await-in-loop */
     public async startCapture () {
         // enum FaceIndex {
         //     right = 0,
@@ -228,14 +241,14 @@ export class ReflectionProbe extends Component {
         for (let i = 0; i < this._cameraDir.length; i++) {
             this._updateCameraDir(this._cameraDir[i]);
             const rt = this._createTargetTexture();
-            this._resetTargetTexture(rt);
+            this._setTargetTexture(rt);
             await this.waitForNextFrame();
             let pixelData = rt.readPixels();
             rt.destroy();
             pixelData = this.flipImage(pixelData, this._size, this._size);
             const fileName = `capture_${i}.png`;
             const fullPath = this._fullPath + fileName;
-            EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {});
+            await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {});
         }
         this._updateCameraDir(new Vec3(0, 0, 0));
     }
@@ -262,7 +275,7 @@ export class ReflectionProbe extends Component {
         }
         this._camera.setViewportInOrientedSpace(new Rect(0, 0, 1, 1));
         this._camera.fovAxis = CameraFOVAxis.VERTICAL;
-        this._camera.fov = toRadian(45);
+        this._camera.fov = toRadian(this._fov);
         this._camera.orthoHeight = 10;
         this._camera.nearClip = this._near;
         this._camera.farClip = this._far;
@@ -300,12 +313,13 @@ export class ReflectionProbe extends Component {
         rt.reset({ width, height });
         return rt;
     }
-    private _resetTargetTexture (rt:RenderTexture) {
+    private _setTargetTexture (rt:RenderTexture) {
         const window = rt.window;
         this._camera!.changeTargetWindow(window);
         this._camera!.setFixedSize(window!.width, window!.height);
     }
-    public flipImage (data:Uint8Array|null, width:number, height:number) {
+
+    public flipImage (data: Uint8Array | null, width: number, height: number) {
         if (!data) {
             return null;
         }
