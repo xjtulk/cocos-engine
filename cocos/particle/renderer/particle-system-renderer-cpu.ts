@@ -24,25 +24,26 @@
  */
 
 import { EDITOR } from 'internal:constants';
-import { builtinResMgr } from '../../core/builtin';
-import { Material } from '../../core/assets';
+import { builtinResMgr } from '../../asset/asset-manager';
+import { Material } from '../../asset/assets';
 import { AttributeName, Format, Attribute, FormatInfos } from '../../gfx';
-import { Mat4, Vec2, Vec3, Vec4, pseudoRandom, Quat } from '../../core/math';
+import { Mat4, Vec2, Vec3, Vec4, pseudoRandom, Quat, EPSILON, approx } from '../../core/math';
 import { RecyclePool } from '../../core/memop';
-import { MaterialInstance, IMaterialInstanceInfo } from '../../core/renderer/core/material-instance';
-import { MacroRecord } from '../../core/renderer/core/pass-utils';
+import { MaterialInstance, IMaterialInstanceInfo } from '../../render-scene/core/material-instance';
+import { MacroRecord } from '../../render-scene/core/pass-utils';
 import { AlignmentSpace, RenderMode, Space } from '../enum';
 import { Particle, IParticleModule, PARTICLE_MODULE_ORDER, PARTICLE_MODULE_NAME } from '../particle';
 import { ParticleSystemRendererBase } from './particle-system-renderer-base';
 import { Component } from '../../core';
-import { Camera } from '../../core/renderer/scene/camera';
-import { Pass } from '../../core/renderer';
+import { Camera } from '../../render-scene/scene/camera';
+import { Pass } from '../../render-scene';
 import { ParticleNoise } from '../noise';
 import { NoiseModule } from '../animator/noise-module';
 import { legacyCC } from '../../core/global-exports';
 
 const _tempAttribUV = new Vec3();
 const _tempWorldTrans = new Mat4();
+const _tempParentInverse = new Mat4();
 const _node_rot = new Quat();
 const _node_euler = new Vec3();
 
@@ -375,8 +376,8 @@ export default class ParticleSystemRendererCPU extends ParticleSystemRendererBas
         }
 
         if (ps.node.parent) {
-            ps.node.parent.getWorldMatrix(_tempWorldTrans);
-            _tempWorldTrans.invert();
+            ps.node.parent.getWorldMatrix(_tempParentInverse);
+            _tempParentInverse.invert();
         }
 
         for (let i = 0; i < this._particles!.length; ++i) {
@@ -399,14 +400,16 @@ export default class ParticleSystemRendererCPU extends ParticleSystemRendererBas
                 this._gravity.y = gravityFactor;
                 this._gravity.z = 0.0;
                 this._gravity.w = 1.0;
-                if (ps.node.parent) {
-                    this._gravity = this._gravity.transformMat4(_tempWorldTrans);
-                }
-                this._gravity = this._gravity.transformMat4(this._localMat);
+                if (!approx(gravityFactor, 0.0, EPSILON)) {
+                    if (ps.node.parent) {
+                        this._gravity = this._gravity.transformMat4(_tempParentInverse);
+                    }
+                    this._gravity = this._gravity.transformMat4(this._localMat);
 
-                p.velocity.x += this._gravity.x;
-                p.velocity.y += this._gravity.y;
-                p.velocity.z += this._gravity.z;
+                    p.velocity.x += this._gravity.x;
+                    p.velocity.y += this._gravity.y;
+                    p.velocity.z += this._gravity.z;
+                }
             } else {
                 // apply gravity.
                 p.velocity.y -= ps.gravityModifier.evaluate(1 - p.remainingLifetime / p.startLifetime, pseudoRandom(p.randomSeed))! * 9.8 * dt;
