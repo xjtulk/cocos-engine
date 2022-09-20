@@ -22,12 +22,14 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, ReflectionProbeManager, Root, Texture2D, toRadian, Vec3 } from '../..';
+import { EDITOR } from 'internal:constants';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, ReflectionProbeManager, RenderPipeline, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { ccclass, editable, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
-import { ClearFlagBit } from '../../gfx/base/define';
+import { deviceManager, Texture } from '../../gfx';
+import { BufferTextureCopy, ClearFlagBit } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
@@ -116,7 +118,9 @@ export class ReflectionProbe extends Component {
     ];
     private _camera: Camera | null = null;
 
-    //private _captureFace: RenderTexture[] = [];
+    public _realtimeTexture: RenderTexture | null = null;
+
+    public renderTexture: Texture | null = null;
 
     private _fullPath = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
 
@@ -215,18 +219,64 @@ export class ReflectionProbe extends Component {
     }
 
     public onLoad () {
-        ReflectionProbeManager.probeManager?.addProbe(this);
         this._createCamera();
     }
 
     public onEnable () {
-        this._attachToScene();
+        console.log('onEnable======================');
+        ReflectionProbeManager.probeManager.register(this);
+
+        //attach camera to scene
+        if (!this.node.scene || !this._camera) {
+            return;
+        }
+        if (this._camera && this._camera.scene) {
+            this._camera.scene.removeCamera(this._camera);
+        }
+        const rs = this._getRenderScene();
+        rs.addCamera(this._camera);
+
+        if (this.probeType === ProbeType.REALTIME) {
+            //this._realtimeTexture = this._createTargetTexture();
+        }
+    }
+    public start () {
+        console.log('start======================');
+        this._updateCameraDir(this._cameraDir[2]);
     }
     public onDestroy () {
         if (this._camera) {
             this._camera.destroy();
             this._camera = null;
         }
+    }
+    private  totalTime = 0;
+    public update (dt: number) {
+        this.totalTime += dt;
+        if (this.renderTexture && this.totalTime >= 5) {
+            this.totalTime = 0;
+            const needSize = 4 * this.resolution * this.resolution;
+            const buffer = new Uint8Array(needSize);
+
+            const bufferViews: ArrayBufferView[] = [];
+            const regions: BufferTextureCopy[] = [];
+
+            const region0 = new BufferTextureCopy();
+            region0.texOffset.x = 0;
+            region0.texOffset.y = 0;
+            region0.texExtent.width = this.resolution;
+            region0.texExtent.height = this.resolution;
+            regions.push(region0);
+
+            bufferViews.push(buffer);
+            deviceManager.gfxDevice?.copyTextureToBuffers(this.renderTexture, bufferViews, regions);
+            console.log(buffer);
+        }
+        // if (this.totalTime >= 5) {
+        //     this.totalTime = 0;
+        //     const data = this._realtimeTexture!.readPixels();
+        //     console.log(data);
+        // }
     }
     /* eslint-disable no-await-in-loop */
     public async startCapture () {
@@ -292,20 +342,11 @@ export class ReflectionProbe extends Component {
         this._camera.update(true);
         return this._camera;
     }
-    private _attachToScene () {
-        if (!this.node.scene || !this._camera) {
-            return;
-        }
-        if (this._camera && this._camera.scene) {
-            this._camera.scene.removeCamera(this._camera);
-        }
-        const rs = this._getRenderScene();
-        rs.addCamera(this._camera);
-    }
     private _updateCameraDir (pos: Vec3) {
         this.node.setRotationFromEuler(pos);
         this._camera!.update(true);
     }
+
     private _createTargetTexture () {
         const width = this._size;
         const height = this._size;
@@ -313,6 +354,7 @@ export class ReflectionProbe extends Component {
         rt.reset({ width, height });
         return rt;
     }
+
     private _setTargetTexture (rt:RenderTexture) {
         const window = rt.window;
         this._camera!.changeTargetWindow(window);
@@ -335,5 +377,13 @@ export class ReflectionProbe extends Component {
             }
         }
         return newData;
+    }
+
+    public isFinishedRendering () {
+
+    }
+
+    public renderProbe () {
+
     }
 }

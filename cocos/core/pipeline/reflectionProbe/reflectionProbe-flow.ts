@@ -57,12 +57,7 @@ export class ReflectionProbeFlow extends RenderFlow {
         stages: [],
     };
 
-    private _probeRenderPass: RenderPass | null = null;
-
-    private _width = 512;
-    private _height = 512;
-
-    private _framebuffer: Framebuffer = null!;
+    private _probeFrameBufferMap: Map<ReflectionProbe, Framebuffer> = new Map();
 
     public initialize (info: IRenderFlowInfo): boolean {
         super.initialize(info);
@@ -80,58 +75,67 @@ export class ReflectionProbeFlow extends RenderFlow {
     }
 
     public render (camera: Camera) {
+        const probes = ReflectionProbeManager.probeManager.getProbes();
+        if (probes.length === 0) return;
         const pipeline = this._pipeline as ForwardPipeline;
-        const globalDS = pipeline.descriptorSet;
-        const reflectionProbes = ReflectionProbeManager.probeManager?.getReflectionProbes();
-        if (reflectionProbes === undefined || reflectionProbes.length === 0) {
-            return;
-        }
-        this._initFrameBuffer(pipeline);
-        for (let i = 0; i < reflectionProbes.length; i++) {
-            const probe = reflectionProbes[i];
-            this._renderStage(probe, this._framebuffer, globalDS);
+        for (let i = 0; i < probes.length; i++) {
+            const probe = probes[i];
+            if (!this._probeFrameBufferMap.has(probe)) {
+                this._initFrameBuffer(probe, pipeline);
+            }
+            this._renderStage(probe);
         }
     }
 
     public destroy () {
         super.destroy();
-        if (this._probeRenderPass) { this._probeRenderPass.destroy(); }
     }
-    private _renderStage (probe: ReflectionProbe, frameBuffer: Framebuffer, globalDS: DescriptorSet) {
+    private _renderStage (probe:ReflectionProbe) {
         for (let i = 0; i < this._stages.length; i++) {
             const shadowStage = this._stages[i] as ReflectionProbeStage;
-            shadowStage.setUsage(globalDS, frameBuffer);
+            const frameBuffer = this._probeFrameBufferMap.get(probe);
+            shadowStage.setUsageInfo(probe, frameBuffer!);
             shadowStage.render(probe.camera!);
         }
     }
-    public _initFrameBuffer  (pipeline: RenderPipeline) {
+    public _initFrameBuffer (probe:ReflectionProbe, pipeline: RenderPipeline) {
         const { device } = pipeline;
-
+        const format = supportsR32FloatTexture(device) ? Format.R32F : Format.RGBA8;
         // create renderPass
         const colorAttachment = new ColorAttachment();
-        colorAttachment.format = Format.RGBA8;
-        colorAttachment.loadOp = LoadOp.CLEAR;
+        colorAttachment.format = format;
+        colorAttachment.loadOp = LoadOp.CLEAR; // should clear color attachment
         colorAttachment.storeOp = StoreOp.STORE;
-        colorAttachment.barrier = device.getGeneralBarrier(new GeneralBarrierInfo(
-            AccessFlagBit.NONE,
-            AccessFlagBit.COLOR_ATTACHMENT_WRITE,
-        ));
-        this._probeRenderPass = device.createRenderPass(new RenderPassInfo([colorAttachment]));
+        colorAttachment.sampleCount = 1;
 
-        const curWidth = this._width;
-        const curHeight = this._height;
+        const depthStencilAttachment = new DepthStencilAttachment();
+        depthStencilAttachment.format = Format.DEPTH_STENCIL;
+        depthStencilAttachment.depthLoadOp = LoadOp.CLEAR;
+        depthStencilAttachment.depthStoreOp = StoreOp.DISCARD;
+        depthStencilAttachment.stencilLoadOp = LoadOp.CLEAR;
+        depthStencilAttachment.stencilStoreOp = StoreOp.DISCARD;
+        depthStencilAttachment.sampleCount = 1;
+
+        const renderPassInfo = new RenderPassInfo([colorAttachment], depthStencilAttachment);
+        const probeRenderPass = device.createRenderPass(renderPassInfo);
+
+        //const textures = probe.getRealtimeTexture();
 
         const renderTexture = device.createTexture(new TextureInfo(
             TextureType.TEX2D,
             TextureUsageBit.COLOR_ATTACHMENT | TextureUsageBit.SAMPLED,
             Format.RGBA8,
-            curWidth >> 1,
-            curHeight >> 1,
+            probe.resolution,
+            probe.resolution,
         ));
-        this._framebuffer = device.createFramebuffer(new FramebufferInfo(
-            this._probeRenderPass,
+
+        const framebuffer = device.createFramebuffer(new FramebufferInfo(
+            probeRenderPass,
             [renderTexture],
         ));
+        this._probeFrameBufferMap.set(probe, framebuffer);
+
+        probe.renderTexture = renderTexture;
     }
 
     private clearShadowMap (validLights: Light[], camera: Camera) {

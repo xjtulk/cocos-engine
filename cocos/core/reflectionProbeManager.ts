@@ -25,13 +25,21 @@
 import { ReflectionProbe } from './renderer/scene/reflectionProbe';
 
 export class ReflectionProbeManager {
-    public static probeManager: ReflectionProbeManager | null = null;
+    public static probeManager: ReflectionProbeManager;
 
     private _probes: ReflectionProbe[] = [];
-    public addProbe (probe: ReflectionProbe) {
+    public register (probe: ReflectionProbe) {
         this._probes.push(probe);
     }
-    public getReflectionProbes (): ReflectionProbe[] {
+    public unregister (probe: ReflectionProbe) {
+        for (let i = 0; i < this._probes.length; i++) {
+            if (this._probes[i] === probe) {
+                this._probes.splice(i, 1);
+                break;
+            }
+        }
+    }
+    public getProbes (): ReflectionProbe[] {
         return this._probes;
     }
 }
