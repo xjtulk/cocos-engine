@@ -23,7 +23,7 @@
  THE SOFTWARE.
  */
 
-import { Color, Rect, Framebuffer, DescriptorSet, ClearFlagBit, PipelineState, Device, RenderPass, CommandBuffer } from '../../gfx';
+import { Color, Rect, Framebuffer, ClearFlagBit } from '../../gfx';
 import { IRenderStageInfo, RenderStage } from '../render-stage';
 import { ForwardStagePriority } from '../enum';
 import { ForwardPipeline } from '../forward/forward-pipeline';
@@ -31,7 +31,6 @@ import { SetIndex } from '../define';
 import { ReflectionProbeFlow } from './reflectionProbe-flow';
 import { Camera, ReflectionProbe } from '../../renderer/scene';
 import { ccclass } from '../../data/decorators';
-import { getPhaseID, Material, PipelineStateManager, RenderPipeline } from '../..';
 import { RenderReflectionProbeQueue } from '../render-reflection-probe-queue';
 
 const colors: Color[] = [new Color(1, 1, 1, 1)];
@@ -55,7 +54,6 @@ export class ReflectionProbeStage extends RenderStage {
     private _frameBuffer: Framebuffer | null = null;
     private _renderArea = new Rect();
     private _probe: ReflectionProbe | null = null;
-    private _phaseID = getPhaseID('default');
     private _probeRenderQueue!: RenderReflectionProbeQueue;
 
     /**
@@ -99,7 +97,7 @@ export class ReflectionProbeStage extends RenderStage {
         const pipeline = this._pipeline;
         const cmdBuff = pipeline.commandBuffers[0];
         this._probeRenderQueue.gatherRenderPasses(camera, cmdBuff);
-        //pipeline.pipelineUBO.updateCameraUBO(camera);
+        pipeline.pipelineUBO.updateCameraUBO(camera);
 
         this._renderArea.x = 0;
         this._renderArea.y = 0;

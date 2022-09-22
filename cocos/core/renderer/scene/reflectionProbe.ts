@@ -26,9 +26,10 @@ import { EDITOR } from 'internal:constants';
 import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Quat, Rect, ReflectionProbeManager, RenderPipeline, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
+import { property } from '../../data/class-decorator';
 import { ccclass, editable, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
-import { deviceManager, Texture } from '../../gfx';
+import { deviceManager, Framebuffer, Texture } from '../../gfx';
 import { BufferTextureCopy, ClearFlagBit } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
@@ -77,6 +78,15 @@ export const ProbeType = Enum({
     BAKE: 0,
     REALTIME: 1,
 });
+export const CameraDir = Enum({
+    right: new Vec3(90, 0, 0),
+    left: new Vec3(-90, 0, 0),
+    top: new Vec3(0, 0, 0),
+    bottom: new Vec3(0, -180, 0),
+    front: new Vec3(0, 90, 0),
+    back: new Vec3(0, -90, 0),
+});
+
 @ccclass('cc.ReflectionProbe')
 @menu('Rendering/ReflectionProbe')
 @executeInEditMode
@@ -107,8 +117,8 @@ export class ReflectionProbe extends Component {
     @serializable
     protected _fov = 45;
 
-    @serializable
-    protected _materialTest: Material | null = null;
+    @property([Material])
+    materials: Material[] = [];
 
     private _cameraDir: Vec3[] =
     [
@@ -123,9 +133,9 @@ export class ReflectionProbe extends Component {
 
     public realtimeTextures: Texture[] = [];
 
-    public renderTexture: Texture | null = null;
-
     private _fullPath = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
+
+    public framebuffer: Framebuffer[] = [];
 
     @readOnly
     @type(CCBoolean)
@@ -217,13 +227,6 @@ export class ReflectionProbe extends Component {
     get far () {
         return this._far;
     }
-    @type(Material)
-    set materialTest (val) {
-        this._materialTest = val;
-    }
-    get materialTest () {
-        return this._materialTest;
-    }
 
     get camera () {
         return this._camera;
@@ -234,8 +237,9 @@ export class ReflectionProbe extends Component {
     }
 
     public onEnable () {
-        ReflectionProbeManager.probeManager.register(this);
-
+        if (this._probeType === ProbeType.REALTIME) {
+            ReflectionProbeManager.probeManager.register(this);
+        }
         //attach camera to scene
         if (!this.node.scene || !this._camera) {
             return;
@@ -247,11 +251,13 @@ export class ReflectionProbe extends Component {
         rs.addCamera(this._camera);
     }
     public start () {
-        if (this.probeType === ProbeType.REALTIME) {
-            //this._realtimeTexture = this._createTargetTexture();
-            //this._setTargetTexture(this._realtimeTexture);
-            this._camera!.update(true);
-            this._materialTest!.setProperty('mainTexture', this.realtimeTextures[0]);
+        if (this._probeType === ProbeType.REALTIME) {
+            this.scheduleOnce(() => {
+                for (let i = 0; i < this.materials.length; i++) {
+                    const mat = this.materials[i];
+                    mat.setProperty('mainTexture', this.framebuffer[i].colorTextures[0]);
+                }
+            }, 1.0);
         }
     }
     public onDestroy () {
@@ -259,35 +265,45 @@ export class ReflectionProbe extends Component {
             this._camera.destroy();
             this._camera = null;
         }
+        for (let i = 0; i < this.framebuffer.length; i++) {
+            const frameBuffer = this.framebuffer[i];
+            if (!frameBuffer) { continue; }
+            const renderTargets = frameBuffer.colorTextures;
+            for (let j = 0; j < renderTargets.length; j++) {
+                const renderTarget = renderTargets[j];
+                if (renderTarget) { renderTarget.destroy(); }
+            }
+            frameBuffer.renderPass.destroy();
+            frameBuffer.destroy();
+        }
+        this.framebuffer = [];
     }
     private  totalTime = 0;
     public update (dt: number) {
         this.totalTime += dt;
-        if (this.realtimeTextures.length > 0 && this.totalTime >= 5) {
-            this.totalTime = 0;
-            const needSize = 4 * this.resolution * this.resolution;
-            const buffer = new Uint8Array(needSize);
+        if (this.framebuffer.length === 6 && this.totalTime >= 2) {
+            // this.totalTime = 0;
+            // const needSize = 4 * this.resolution * this.resolution;
+            // const buffer = new Uint8Array(needSize);
 
-            const bufferViews: ArrayBufferView[] = [];
-            const regions: BufferTextureCopy[] = [];
+            // const bufferViews: ArrayBufferView[] = [];
+            // const regions: BufferTextureCopy[] = [];
 
-            const region0 = new BufferTextureCopy();
-            region0.texOffset.x = 0;
-            region0.texOffset.y = 0;
-            region0.texExtent.width = this.resolution;
-            region0.texExtent.height = this.resolution;
-            regions.push(region0);
+            // const region0 = new BufferTextureCopy();
+            // region0.texOffset.x = 0;
+            // region0.texOffset.y = 0;
+            // region0.texExtent.width = this.resolution;
+            // region0.texExtent.height = this.resolution;
+            // regions.push(region0);
 
-            bufferViews.push(buffer);
-            deviceManager.gfxDevice?.copyTextureToBuffers(this.realtimeTextures[0], bufferViews, regions);
+            // bufferViews.push(buffer);
+            // deviceManager.gfxDevice?.copyTextureToBuffers(this.realtimeTextures[0], bufferViews, regions);
 
-            this._materialTest!.setProperty('mainTexture', this.realtimeTextures[0]);
+            // for (let i = 0; i < this.materials.length; i++) {
+            //     const mat = this.materials[i];
+            //     mat.setProperty('mainTexture', this.framebuffer[i].colorTextures[0]);
+            // }
         }
-        // if (this.totalTime >= 5) {
-        //     this.totalTime = 0;
-        //     const data = this._realtimeTexture!.readPixels();
-        //     console.log(data);
-        // }
     }
     /* eslint-disable no-await-in-loop */
     public async startCapture () {
@@ -355,7 +371,9 @@ export class ReflectionProbe extends Component {
     }
     private _updateCameraDir (pos: Vec3) {
         this.node.setRotationFromEuler(pos);
-        this._camera!.update(true);
+        if (this._camera) {
+            this._camera.update(true);
+        }
     }
 
     private _createTargetTexture () {
@@ -394,11 +412,14 @@ export class ReflectionProbe extends Component {
         }
         return newData;
     }
-
-    public isFinishedRendering () {
-
+    public isFrameBufferInitFinished () {
+        return this.framebuffer.length === 6;
     }
-
+    public updateCamera (idx:number) {
+        this._updateCameraDir(this._cameraDir[idx]);
+    }
+    public isFinishedRendering () {
+    }
     public renderProbe () {
 
     }

@@ -52,6 +52,9 @@ export class ReflectionProbeManager {
         }
         return null;
     }
+    public clearAll () {
+        this._probes = [];
+    }
 }
 
 ReflectionProbeManager.probeManager = new ReflectionProbeManager();
