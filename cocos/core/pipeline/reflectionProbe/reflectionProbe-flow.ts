@@ -35,10 +35,11 @@ import { RenderFlowTag } from '../pipeline-serialization';
 import { ForwardPipeline } from '../forward/forward-pipeline';
 import { RenderPipeline } from '..';
 import { Light } from '../../renderer/scene/light';
-import { Camera } from '../../renderer/scene';
+import { Camera, CameraType } from '../../renderer/scene';
 import { ccclass } from '../../data/decorators';
 import { ReflectionProbeManager } from '../../reflectionProbeManager';
 import { ReflectionProbe } from '../../renderer/scene/reflectionProbe';
+import { RenderTexture } from '../..';
 
 /**
  * @en ReflectionProbe render flow
@@ -75,13 +76,14 @@ export class ReflectionProbeFlow extends RenderFlow {
     }
 
     public render (camera: Camera) {
+        if (camera.cameraType !== CameraType.REFLECTION_PROBE) return;
         const probes = ReflectionProbeManager.probeManager.getProbes();
         if (probes.length === 0) return;
         const pipeline = this._pipeline as ForwardPipeline;
         for (let i = 0; i < probes.length; i++) {
             const probe = probes[i];
             if (!this._probeFrameBufferMap.has(probe)) {
-                this._initFrameBuffer(probe, pipeline);
+                this._initFrameBuffer(camera, probe, pipeline);
             }
             this._renderStage(probe);
         }
@@ -98,7 +100,7 @@ export class ReflectionProbeFlow extends RenderFlow {
             shadowStage.render(probe.camera!);
         }
     }
-    public _initFrameBuffer (probe:ReflectionProbe, pipeline: RenderPipeline) {
+    public _initFrameBuffer (camera:Camera, probe:ReflectionProbe, pipeline: RenderPipeline) {
         const { device } = pipeline;
         const format = supportsR32FloatTexture(device) ? Format.R32F : Format.RGBA8;
         // create renderPass
@@ -119,8 +121,6 @@ export class ReflectionProbeFlow extends RenderFlow {
         const renderPassInfo = new RenderPassInfo([colorAttachment], depthStencilAttachment);
         const probeRenderPass = device.createRenderPass(renderPassInfo);
 
-        //const textures = probe.getRealtimeTexture();
-
         const renderTexture = device.createTexture(new TextureInfo(
             TextureType.TEX2D,
             TextureUsageBit.COLOR_ATTACHMENT | TextureUsageBit.SAMPLED,
@@ -134,8 +134,7 @@ export class ReflectionProbeFlow extends RenderFlow {
             [renderTexture],
         ));
         this._probeFrameBufferMap.set(probe, framebuffer);
-
-        probe.renderTexture = renderTexture;
+        probe.realtimeTextures.push(renderTexture);
     }
 
     private clearShadowMap (validLights: Light[], camera: Camera) {

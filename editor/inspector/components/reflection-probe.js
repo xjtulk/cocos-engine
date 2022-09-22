@@ -18,7 +18,7 @@ exports.ready = function() {
     const $button = document.createElement('ui-button');
     $button.setAttribute('slot', 'content');
     $button.setAttribute('class', 'blue');
-    $button.innerText = 'Bake';
+    $button.innerText = 'Generate';
     $prop.appendChild($button);
 
     $button.addEventListener('confirm', async () => {

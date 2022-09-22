@@ -23,7 +23,7 @@
  THE SOFTWARE.
  */
 import { EDITOR } from 'internal:constants';
-import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, ReflectionProbeManager, RenderPipeline, Root, Texture2D, toRadian, Vec3 } from '../..';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Quat, Rect, ReflectionProbeManager, RenderPipeline, Root, Texture2D, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { ccclass, editable, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
@@ -107,6 +107,9 @@ export class ReflectionProbe extends Component {
     @serializable
     protected _fov = 45;
 
+    @serializable
+    protected _materialTest: Material | null = null;
+
     private _cameraDir: Vec3[] =
     [
         new Vec3(90, 0, 0),
@@ -118,7 +121,7 @@ export class ReflectionProbe extends Component {
     ];
     private _camera: Camera | null = null;
 
-    public _realtimeTexture: RenderTexture | null = null;
+    public realtimeTextures: Texture[] = [];
 
     public renderTexture: Texture | null = null;
 
@@ -214,6 +217,14 @@ export class ReflectionProbe extends Component {
     get far () {
         return this._far;
     }
+    @type(Material)
+    set materialTest (val) {
+        this._materialTest = val;
+    }
+    get materialTest () {
+        return this._materialTest;
+    }
+
     get camera () {
         return this._camera;
     }
@@ -223,7 +234,6 @@ export class ReflectionProbe extends Component {
     }
 
     public onEnable () {
-        console.log('onEnable======================');
         ReflectionProbeManager.probeManager.register(this);
 
         //attach camera to scene
@@ -235,14 +245,14 @@ export class ReflectionProbe extends Component {
         }
         const rs = this._getRenderScene();
         rs.addCamera(this._camera);
-
-        if (this.probeType === ProbeType.REALTIME) {
-            //this._realtimeTexture = this._createTargetTexture();
-        }
     }
     public start () {
-        console.log('start======================');
-        this._updateCameraDir(this._cameraDir[2]);
+        if (this.probeType === ProbeType.REALTIME) {
+            //this._realtimeTexture = this._createTargetTexture();
+            //this._setTargetTexture(this._realtimeTexture);
+            this._camera!.update(true);
+            this._materialTest!.setProperty('mainTexture', this.realtimeTextures[0]);
+        }
     }
     public onDestroy () {
         if (this._camera) {
@@ -253,7 +263,7 @@ export class ReflectionProbe extends Component {
     private  totalTime = 0;
     public update (dt: number) {
         this.totalTime += dt;
-        if (this.renderTexture && this.totalTime >= 5) {
+        if (this.realtimeTextures.length > 0 && this.totalTime >= 5) {
             this.totalTime = 0;
             const needSize = 4 * this.resolution * this.resolution;
             const buffer = new Uint8Array(needSize);
@@ -269,8 +279,9 @@ export class ReflectionProbe extends Component {
             regions.push(region0);
 
             bufferViews.push(buffer);
-            deviceManager.gfxDevice?.copyTextureToBuffers(this.renderTexture, bufferViews, regions);
-            console.log(buffer);
+            deviceManager.gfxDevice?.copyTextureToBuffers(this.realtimeTextures[0], bufferViews, regions);
+
+            this._materialTest!.setProperty('mainTexture', this.realtimeTextures[0]);
         }
         // if (this.totalTime >= 5) {
         //     this.totalTime = 0;
@@ -319,7 +330,7 @@ export class ReflectionProbe extends Component {
                 projection: CameraProjection.PERSPECTIVE,
                 window: legacyCC.director.root && legacyCC.director.root.mainWindow,
                 priority: 0,
-                cameraType: CameraType.DEFAULT,
+                cameraType: CameraType.REFLECTION_PROBE,
                 trackingType: TrackingType.NO_TRACKING,
             });
         }
@@ -356,9 +367,14 @@ export class ReflectionProbe extends Component {
     }
 
     private _setTargetTexture (rt:RenderTexture) {
-        const window = rt.window;
-        this._camera!.changeTargetWindow(window);
-        this._camera!.setFixedSize(window!.width, window!.height);
+        if (!this._camera) {
+            return;
+        }
+        if (rt) {
+            const window = rt.window;
+            this._camera.changeTargetWindow(window);
+            this._camera.setFixedSize(window!.width, window!.height);
+        }
     }
 
     public flipImage (data: Uint8Array | null, width: number, height: number) {

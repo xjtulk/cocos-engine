@@ -22,6 +22,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+import { Camera } from './components';
 import { ReflectionProbe } from './renderer/scene/reflectionProbe';
 
 export class ReflectionProbeManager {
@@ -41,6 +42,15 @@ export class ReflectionProbeManager {
     }
     public getProbes (): ReflectionProbe[] {
         return this._probes;
+    }
+
+    public getProbeByCamera (camera: Camera | null) {
+        for (let i = 0; i < this._probes.length; i++) {
+            if (this._probes[i].camera === camera) {
+                return this._probes[i];
+            }
+        }
+        return null;
     }
 }
 

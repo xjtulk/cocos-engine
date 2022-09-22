@@ -23,7 +23,7 @@
  THE SOFTWARE.
  */
 
-import { Color, Rect, Framebuffer, DescriptorSet, ClearFlagBit } from '../../gfx';
+import { Color, Rect, Framebuffer, DescriptorSet, ClearFlagBit, PipelineState, Device, RenderPass, CommandBuffer } from '../../gfx';
 import { IRenderStageInfo, RenderStage } from '../render-stage';
 import { ForwardStagePriority } from '../enum';
 import { ForwardPipeline } from '../forward/forward-pipeline';
@@ -31,6 +31,8 @@ import { SetIndex } from '../define';
 import { ReflectionProbeFlow } from './reflectionProbe-flow';
 import { Camera, ReflectionProbe } from '../../renderer/scene';
 import { ccclass } from '../../data/decorators';
+import { getPhaseID, Material, PipelineStateManager, RenderPipeline } from '../..';
+import { RenderReflectionProbeQueue } from '../render-reflection-probe-queue';
 
 const colors: Color[] = [new Color(1, 1, 1, 1)];
 
@@ -53,6 +55,8 @@ export class ReflectionProbeStage extends RenderStage {
     private _frameBuffer: Framebuffer | null = null;
     private _renderArea = new Rect();
     private _probe: ReflectionProbe | null = null;
+    private _phaseID = getPhaseID('default');
+    private _probeRenderQueue!: RenderReflectionProbeQueue;
 
     /**
      * @en Sets the probe info
@@ -67,6 +71,7 @@ export class ReflectionProbeStage extends RenderStage {
 
     public destroy () {
         this._frameBuffer = null;
+        this._probeRenderQueue?.clear();
     }
 
     public clearFramebuffer (camera: Camera) {
@@ -93,7 +98,8 @@ export class ReflectionProbeStage extends RenderStage {
     public render (camera: Camera) {
         const pipeline = this._pipeline;
         const cmdBuff = pipeline.commandBuffers[0];
-        pipeline.pipelineUBO.updateCameraUBO(camera);
+        this._probeRenderQueue.gatherRenderPasses(camera, cmdBuff);
+        //pipeline.pipelineUBO.updateCameraUBO(camera);
 
         this._renderArea.x = 0;
         this._renderArea.y = 0;
@@ -107,15 +113,17 @@ export class ReflectionProbeStage extends RenderStage {
             colors[0].y = camera.clearColor.y;
             colors[0].z = camera.clearColor.z;
         }
-
+        const device = pipeline.device;
         cmdBuff.beginRenderPass(renderPass, this._frameBuffer!, this._renderArea,
             colors, camera.clearDepth, camera.clearStencil);
         cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, pipeline.descriptorSet);
 
+        this._probeRenderQueue.recordCommandBuffer(device, renderPass, cmdBuff);
         cmdBuff.endRenderPass();
     }
 
     public activate (pipeline: ForwardPipeline, flow: ReflectionProbeFlow) {
         super.activate(pipeline, flow);
+        this._probeRenderQueue = new RenderReflectionProbeQueue(pipeline);
     }
 }
