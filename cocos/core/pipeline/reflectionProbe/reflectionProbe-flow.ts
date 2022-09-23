@@ -95,7 +95,7 @@ export class ReflectionProbeFlow extends RenderFlow {
             //render six face
             for (let n = 0; n < 6; n++) {
                 //update camera dirction
-                probe.updateCamera(n);
+                probe.updateCameraDir(n);
                 const probeStage = this._stages[i] as ReflectionProbeStage;
                 const frameBuffer = probe.framebuffer[n];
                 probeStage.setUsageInfo(probe, frameBuffer);

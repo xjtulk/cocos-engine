@@ -78,14 +78,22 @@ export const ProbeType = Enum({
     BAKE: 0,
     REALTIME: 1,
 });
-export const CameraDir = Enum({
-    right: new Vec3(90, 0, 0),
-    left: new Vec3(-90, 0, 0),
-    top: new Vec3(0, 0, 0),
-    bottom: new Vec3(0, -180, 0),
-    front: new Vec3(0, 90, 0),
-    back: new Vec3(0, -90, 0),
-});
+const cameraDir: Vec3[] = [
+    new Vec3(0, -90, 0),
+    new Vec3(0, 90, 0),
+    new Vec3(90, 0, 0),
+    new Vec3(-90, 0, 0),
+    new Vec3(0, 0, 0),
+    new Vec3(0, 180, 0),
+];
+enum ProbeFaceIndex {
+    right = 0,
+    left = 1,
+    top = 2,
+    bottom = 3,
+    front = 4,
+    back = 5,
+}
 declare const Editor: any;
 @ccclass('cc.ReflectionProbe')
 @menu('Rendering/ReflectionProbe')
@@ -115,20 +123,11 @@ export class ReflectionProbe extends Component {
     protected _probeType = ProbeType.BAKE;
 
     @serializable
-    protected _fov = 45;
+    protected _fov = 90;
 
     @property([Material])
     materials: Material[] = [];
 
-    private _cameraDir: Vec3[] =
-    [
-        new Vec3(90, 0, 0),
-        new Vec3(-90, 0, 0),
-        new Vec3(0, 0, 0),
-        new Vec3(0, -180, 0),
-        new Vec3(0, 90, 0),
-        new Vec3(0, -90, 0),
-    ];
     private _camera: Camera | null = null;
 
     public realtimeTextures: Texture[] = [];
@@ -136,6 +135,7 @@ export class ReflectionProbe extends Component {
     private _fullPath = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
 
     public framebuffer: Framebuffer[] = [];
+    public static probeFaceIndex = ProbeFaceIndex;
 
     @readOnly
     @type(CCBoolean)
@@ -292,8 +292,8 @@ export class ReflectionProbe extends Component {
         // }
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
         const files:string[] = [];
-        for (let i = 0; i < this._cameraDir.length; i++) {
-            this._updateCameraDir(this._cameraDir[i]);
+        for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
+            this.updateCameraDir(faceIdx);
             const rt = this._createTargetTexture();
             this._setTargetTexture(rt);
             await this.waitForNextFrame();
@@ -301,13 +301,13 @@ export class ReflectionProbe extends Component {
             rt.destroy();
             pixelData = this.flipImage(pixelData, this._size, this._size);
             if (isHDR) {
-                const fileName = `capture_${i}.data`;
+                const fileName = `capture_${faceIdx}.data`;
                 const fullPath = this._fullPath + fileName;
                 await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {
                     files.push(params);
                 });
             } else {
-                const fileName = `capture_${i}.png`;
+                const fileName = `capture_${faceIdx}.png`;
                 const fullPath = this._fullPath + fileName;
                 await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {
                     files.push(params);
@@ -319,7 +319,7 @@ export class ReflectionProbe extends Component {
             method: 'bakeReflectionProbe',
             args: [files, isHDR],
         });
-        this._updateCameraDir(new Vec3(0, 0, 0));
+        this.updateCameraDir(ReflectionProbe.probeFaceIndex.front);
     }
     public async waitForNextFrame () {
         return new Promise<void>((resolve, reject) => {
@@ -361,13 +361,6 @@ export class ReflectionProbe extends Component {
         this._camera.update(true);
         return this._camera;
     }
-    private _updateCameraDir (pos: Vec3) {
-        this.node.setRotationFromEuler(pos);
-        if (this._camera) {
-            this._camera.update(true);
-        }
-    }
-
     private _createTargetTexture () {
         const width = this._size;
         const height = this._size;
@@ -458,8 +451,11 @@ export class ReflectionProbe extends Component {
     public isFrameBufferInitFinished () {
         return this.framebuffer.length === 6;
     }
-    public updateCamera (idx:number) {
-        this._updateCameraDir(this._cameraDir[idx]);
+    public updateCameraDir (faceIdx:number) {
+        this.node.setRotationFromEuler(cameraDir[faceIdx]);
+        if (this._camera) {
+            this._camera.update(true);
+        }
     }
     public isFinishedRendering () {
     }

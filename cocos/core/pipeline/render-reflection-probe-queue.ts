@@ -37,10 +37,21 @@ import { Camera } from '../renderer/scene';
 import { PipelineRuntime } from './custom/pipeline';
 
 const _phaseID = getPhaseID('default');
+const _phaseReflectMapID = getPhaseID('reflect-map');
 function getPassIndex (subModel: SubModel) : number {
     const passes = subModel.passes;
     for (let k = 0; k < passes.length; k++) {
         if (passes[k].phase === _phaseID) {
+            return k;
+        }
+    }
+    return -1;
+}
+
+function getReflectMapPassIndex (subModel: SubModel) : number {
+    const passes = subModel.passes;
+    for (let k = 0; k < passes.length; k++) {
+        if (passes[k].phase === _phaseReflectMapID) {
             return k;
         }
     }
@@ -96,6 +107,10 @@ export class RenderReflectionProbeQueue {
             const subModel = subModels[j];
             const shadowPassIdx = getPassIndex(subModel);
             if (shadowPassIdx < 0) { continue; }
+
+            // const reflectProbePassIdx = getReflectMapPassIndex(subModel);
+            // if (shadowPassIdx < 0) {
+            // }
             const pass = subModel.passes[shadowPassIdx];
             const batchingScheme = pass.batchingScheme;
 
