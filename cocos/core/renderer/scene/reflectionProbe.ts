@@ -30,7 +30,7 @@ import { property } from '../../data/class-decorator';
 import { ccclass, editable, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
 import { deviceManager, Framebuffer, Texture } from '../../gfx';
-import { BufferTextureCopy, ClearFlagBit } from '../../gfx/base/define';
+import { BufferTextureCopy, ClearFlagBit, ColorAttachment, DepthStencilAttachment, Format, RenderPassInfo } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
@@ -86,7 +86,7 @@ export const CameraDir = Enum({
     front: new Vec3(0, 90, 0),
     back: new Vec3(0, -90, 0),
 });
-
+declare const Editor: any;
 @ccclass('cc.ReflectionProbe')
 @menu('Rendering/ReflectionProbe')
 @executeInEditMode
@@ -237,7 +237,7 @@ export class ReflectionProbe extends Component {
     }
 
     public onEnable () {
-        if (this._probeType === ProbeType.REALTIME) {
+        if (!EDITOR) {
             ReflectionProbeManager.probeManager.register(this);
         }
         //attach camera to scene
@@ -251,7 +251,7 @@ export class ReflectionProbe extends Component {
         rs.addCamera(this._camera);
     }
     public start () {
-        if (this._probeType === ProbeType.REALTIME) {
+        if (!EDITOR) {
             this.scheduleOnce(() => {
                 for (let i = 0; i < this.materials.length; i++) {
                     const mat = this.materials[i];
@@ -278,32 +278,7 @@ export class ReflectionProbe extends Component {
         }
         this.framebuffer = [];
     }
-    private  totalTime = 0;
     public update (dt: number) {
-        this.totalTime += dt;
-        if (this.framebuffer.length === 6 && this.totalTime >= 2) {
-            // this.totalTime = 0;
-            // const needSize = 4 * this.resolution * this.resolution;
-            // const buffer = new Uint8Array(needSize);
-
-            // const bufferViews: ArrayBufferView[] = [];
-            // const regions: BufferTextureCopy[] = [];
-
-            // const region0 = new BufferTextureCopy();
-            // region0.texOffset.x = 0;
-            // region0.texOffset.y = 0;
-            // region0.texExtent.width = this.resolution;
-            // region0.texExtent.height = this.resolution;
-            // regions.push(region0);
-
-            // bufferViews.push(buffer);
-            // deviceManager.gfxDevice?.copyTextureToBuffers(this.realtimeTextures[0], bufferViews, regions);
-
-            // for (let i = 0; i < this.materials.length; i++) {
-            //     const mat = this.materials[i];
-            //     mat.setProperty('mainTexture', this.framebuffer[i].colorTextures[0]);
-            // }
-        }
     }
     /* eslint-disable no-await-in-loop */
     public async startCapture () {
@@ -315,18 +290,35 @@ export class ReflectionProbe extends Component {
         //     front = 4,
         //     back = 5,
         // }
+        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
+        const files:string[] = [];
         for (let i = 0; i < this._cameraDir.length; i++) {
             this._updateCameraDir(this._cameraDir[i]);
             const rt = this._createTargetTexture();
             this._setTargetTexture(rt);
             await this.waitForNextFrame();
-            let pixelData = rt.readPixels();
+            let pixelData = this.readPixels(rt);
             rt.destroy();
             pixelData = this.flipImage(pixelData, this._size, this._size);
-            const fileName = `capture_${i}.png`;
-            const fullPath = this._fullPath + fileName;
-            await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {});
+            if (isHDR) {
+                const fileName = `capture_${i}.data`;
+                const fullPath = this._fullPath + fileName;
+                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {
+                    files.push(params);
+                });
+            } else {
+                const fileName = `capture_${i}.png`;
+                const fullPath = this._fullPath + fileName;
+                await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {
+                    files.push(params);
+                });
+            }
         }
+        await Editor.Message.request('scene', 'execute-scene-script', {
+            name: 'inspector',
+            method: 'bakeReflectionProbe',
+            args: [files, isHDR],
+        });
         this._updateCameraDir(new Vec3(0, 0, 0));
     }
     public async waitForNextFrame () {
@@ -380,7 +372,17 @@ export class ReflectionProbe extends Component {
         const width = this._size;
         const height = this._size;
         const rt = new RenderTexture();
-        rt.reset({ width, height });
+        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
+        if (isHDR) {
+            const colorAttachment = new ColorAttachment();
+            colorAttachment.format = Format.RGBA32F;
+            const depthStencilAttachment = new DepthStencilAttachment();
+            depthStencilAttachment.format = Format.DEPTH_STENCIL;
+            const passInfo = new RenderPassInfo([colorAttachment], depthStencilAttachment);
+            rt.reset({ width, height, passInfo });
+        } else {
+            rt.reset({ width, height });
+        }
         return rt;
     }
 
@@ -394,12 +396,53 @@ export class ReflectionProbe extends Component {
             this._camera.setFixedSize(window!.width, window!.height);
         }
     }
+    public readPixels (rt: RenderTexture): Uint8Array | Float32Array | null {
+        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
 
-    public flipImage (data: Uint8Array | null, width: number, height: number) {
+        const width = rt.width;
+        const height = rt.height;
+
+        const needSize = 4 * width * height;
+        let buffer: Uint8Array | Float32Array;
+        if (isHDR) {
+            buffer = new Float32Array(needSize);
+        } else {
+            buffer = new Uint8Array(needSize);
+        }
+
+        const gfxTexture = rt.getGFXTexture();
+        if (!gfxTexture) {
+            return null;
+        }
+
+        const gfxDevice = deviceManager.gfxDevice;
+
+        const bufferViews: ArrayBufferView[] = [];
+        const regions: BufferTextureCopy[] = [];
+
+        const region0 = new BufferTextureCopy();
+        region0.texOffset.x = 0;
+        region0.texOffset.y = 0;
+        region0.texExtent.width = rt.width;
+        region0.texExtent.height = rt.height;
+        regions.push(region0);
+
+        bufferViews.push(buffer);
+        gfxDevice?.copyTextureToBuffers(gfxTexture, bufferViews, regions);
+        return buffer;
+    }
+
+    public flipImage (data: Uint8Array | Float32Array | null, width: number, height: number) {
         if (!data) {
             return null;
         }
-        const newData = new Uint8Array(data.length);
+        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
+        let newData: Uint8Array | Float32Array;
+        if (isHDR) {
+            newData = new Float32Array(data.length);
+        } else {
+            newData = new Uint8Array(data.length);
+        }
         for (let i = 0; i < height; i++) {
             for (let j = 0; j < width; j++) {
                 const index = (width * i + j) * 4;
