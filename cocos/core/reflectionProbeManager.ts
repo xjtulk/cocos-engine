@@ -46,15 +46,6 @@ export class ReflectionProbeManager {
     public getProbes (): ReflectionProbe[] {
         return this._probes;
     }
-
-    public getProbeIdx (probe: ReflectionProbe) {
-        for (let i = 0; i < this._probes.length; i++) {
-            if (this._probes[i] === probe) {
-                return i;
-            }
-        }
-        return -1;
-    }
     public clearAll () {
         this._probes = [];
     }

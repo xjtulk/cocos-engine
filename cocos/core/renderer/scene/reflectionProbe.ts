@@ -104,7 +104,7 @@ export class ReflectionProbe extends Component {
     protected _generate = true;
 
     @serializable
-    protected _size = 1024;
+    protected _size = 512;
     @serializable
     protected _clearFlag = ProbeClearFlag.SKYBOX;
 
@@ -128,12 +128,13 @@ export class ReflectionProbe extends Component {
     @property([Material])
     materials: Material[] = [];
 
-    private _camera: Camera | null = null;
+    public static probeFaceIndex = ProbeFaceIndex;
+    public static probeId = 0;
 
-    public realtimeTextures: Texture[] = [];
+    private _camera: Camera | null = null;
+    private _probeId = ReflectionProbe.probeId;
 
     public framebuffer: Framebuffer[] = [];
-    public static probeFaceIndex = ProbeFaceIndex;
 
     @readOnly
     @type(CCBoolean)
@@ -229,6 +230,7 @@ export class ReflectionProbe extends Component {
     }
 
     public onLoad () {
+        this._probeId = ReflectionProbe.probeId++;
         ReflectionProbeManager.probeManager.register(this);
         this._createCamera();
     }
@@ -299,7 +301,7 @@ export class ReflectionProbe extends Component {
         await Editor.Message.request('scene', 'execute-scene-script', {
             name: 'inspector',
             method: 'bakeReflectionProbe',
-            args: [files, isHDR, ReflectionProbeManager.probeManager.getProbeIdx(this)],
+            args: [files, isHDR, this._probeId],
         });
     }
 
@@ -373,6 +375,9 @@ export class ReflectionProbe extends Component {
         if (this._camera && this._camera.scene) {
             this._camera.scene.removeCamera(this._camera);
         }
+    }
+    public getProbeId () {
+        return this._probeId;
     }
     public readPixels (rt: RenderTexture): Uint8Array | Float32Array | null {
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
