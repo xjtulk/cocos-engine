@@ -23,13 +23,13 @@
  THE SOFTWARE.
  */
 import { EDITOR } from 'internal:constants';
-import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Quat, Rect, ReflectionProbeManager, Root, toRadian, Vec3 } from '../..';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Rect, ReflectionProbeManager, Root, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { property } from '../../data/class-decorator';
 import { ccclass, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
-import { deviceManager, Framebuffer, Texture } from '../../gfx';
+import { deviceManager, Framebuffer } from '../../gfx';
 import { BufferTextureCopy, ClearFlagBit, ColorAttachment, DepthStencilAttachment, Format, RenderPassInfo } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
@@ -134,6 +134,10 @@ export class ReflectionProbe extends Component {
     private _camera: Camera | null = null;
     private _probeId = ReflectionProbe.probeId;
 
+    /**
+     * @en Renders 6 faces to Framebuffer at runtime
+     * @zh 运行时会把6个面渲染至Framebuffer。
+     */
     public framebuffer: Framebuffer[] = [];
 
     @readOnly
@@ -149,6 +153,10 @@ export class ReflectionProbe extends Component {
         return this._generate;
     }
 
+    /**
+     * @en set probe type, bake or realtime
+     * @zh 设置探针类型，烘焙或者运行时
+     */
     @type(ProbeType)
     set probeType (value: number) {
         this._probeType = value;
@@ -156,9 +164,10 @@ export class ReflectionProbe extends Component {
     get probeType () {
         return this._probeType;
     }
+
     /**
-     * @en set texture size
-     * @zh 设置纹理大小
+     * @en set render texture size
+     * @zh 设置渲染纹理大小
      */
     @type(ProbeResolution)
     set resolution (value: number) {
@@ -167,6 +176,11 @@ export class ReflectionProbe extends Component {
     get resolution () {
         return this._size;
     }
+
+    /**
+     * @en Clearing flags of the camera, specifies which part of the framebuffer will be actually cleared every frame.
+     * @zh 相机的缓冲清除标志位，指定帧缓冲的哪部分要每帧清除。
+     */
     @type(ProbeClearFlag)
     set clearFlag (value: number) {
         this._clearFlag = value;
@@ -175,6 +189,11 @@ export class ReflectionProbe extends Component {
     get clearFlag () {
         return this._clearFlag;
     }
+
+    /**
+     * @en Clearing color of the camera.
+     * @zh 相机的颜色缓冲默认值。
+     */
     // eslint-disable-next-line func-names
     @visible(function (this: ReflectionProbe) { return this._clearFlag === ProbeClearFlag.SOLID_COLOR; })
     @type(Color)
@@ -193,11 +212,14 @@ export class ReflectionProbe extends Component {
     get visibility () {
         return this._visibility;
     }
-
     set visibility (val) {
         this._visibility = val;
     }
 
+    /**
+     * @en Field of view of the camera.
+     * @zh 相机的视角大小。
+     */
     @type(CCFloat)
     set fov (val) {
         this._fov = val;
@@ -207,6 +229,10 @@ export class ReflectionProbe extends Component {
         return this._fov;
     }
 
+    /**
+     * @en Near clipping distance of the camera, should be as large as possible within acceptable range.
+     * @zh 相机的近裁剪距离，应在可接受范围内尽量取最大。
+     */
     @type(CCFloat)
     set near (val) {
         this._near = val;
@@ -216,6 +242,10 @@ export class ReflectionProbe extends Component {
         return this._near;
     }
 
+    /**
+     * @en Far clipping distance of the camera, should be as small as possible within acceptable range.
+     * @zh 相机的远裁剪距离，应在可接受范围内尽量取最小。
+     */
     @type(CCFloat)
     set far (val) {
         this._far = val;
@@ -237,6 +267,7 @@ export class ReflectionProbe extends Component {
 
     public onEnable () {
     }
+
     public start () {
         if (!EDITOR) {
             this.scheduleOnce(() => {
@@ -247,6 +278,7 @@ export class ReflectionProbe extends Component {
             }, 1.0);
         }
     }
+
     public onDestroy () {
         if (this._camera) {
             this._camera.destroy();
@@ -265,25 +297,31 @@ export class ReflectionProbe extends Component {
         }
         this.framebuffer = [];
     }
+
     public update (dt: number) {
     }
+
     /* eslint-disable no-await-in-loop */
+    /**
+     * @en Render the six faces of the Probe and use the tool to generate a cubemap and save it to the asset directory.
+     * @zh 渲染Probe的6个面，并且使用工具生成cubemap保存至asset目录。
+     */
     public async capture () {
         this._attachCameraToScene();
-        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
-        const files: string[] = [];
         const originRotation = this.node.getRotation();
+        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
+        const caps = (legacyCC.director.root as Root).device.capabilities;
+        const files: string[] = [];
         for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
             this.updateCameraDir(faceIdx);
-            const rt = this._createTargetTexture();
-            this._setTargetTexture(rt);
+            const renderTexture = this._createTargetTexture();
+            this._setTargetTexture(renderTexture);
             await this.waitForNextFrame();
-            let pixelData = this.readPixels(rt);
-            rt.destroy();
-            const caps = (legacyCC.director.root as Root).device.capabilities;
+            let pixelData = this.readPixels(renderTexture);
             if (caps.clipSpaceMinZ === -1) {
                 pixelData = this.flipImage(pixelData, this._size, this._size);
             }
+            renderTexture.destroy();
             if (isHDR) {
                 const fileName = `capture_${faceIdx}.data`;
                 await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fileName, (params: any) => {
@@ -296,8 +334,11 @@ export class ReflectionProbe extends Component {
                 });
             }
         }
+
         this.node.setRotation(originRotation);
         this._detachCameraFromScene();
+
+        //use the tool to generate a cubemap
         await Editor.Message.request('scene', 'execute-scene-script', {
             name: 'inspector',
             method: 'bakeReflectionProbe',
@@ -371,14 +412,17 @@ export class ReflectionProbe extends Component {
         const rs = this.node.scene.renderScene;
         rs!.addCamera(this._camera);
     }
+
     private _detachCameraFromScene () {
         if (this._camera && this._camera.scene) {
             this._camera.scene.removeCamera(this._camera);
         }
     }
+
     public getProbeId () {
         return this._probeId;
     }
+
     public readPixels (rt: RenderTexture): Uint8Array | Float32Array | null {
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
 
@@ -438,15 +482,18 @@ export class ReflectionProbe extends Component {
         }
         return newData;
     }
+
     public isFrameBufferInitFinished () {
         return this.framebuffer.length === 6;
     }
+
     public updateCameraDir (faceIdx:number) {
         this.node.setRotationFromEuler(cameraDir[faceIdx]);
         if (this._camera) {
             this._camera.update(true);
         }
     }
+
     public async waitForNextFrame () {
         return new Promise<void>((resolve, reject) => {
             director.once(Director.EVENT_END_FRAME, () => {
@@ -454,8 +501,10 @@ export class ReflectionProbe extends Component {
             });
         });
     }
+
     public isFinishedRendering () {
     }
+
     public renderProbe () {
     }
 }
