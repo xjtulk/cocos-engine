@@ -394,7 +394,7 @@ export class ReflectionProbe extends Component {
         return rt;
     }
 
-    private _setTargetTexture (rt:RenderTexture) {
+    private _setTargetTexture (rt: RenderTexture) {
         if (!this._camera) {
             return;
         }
@@ -487,7 +487,7 @@ export class ReflectionProbe extends Component {
         return this.framebuffer.length === 6;
     }
 
-    public updateCameraDir (faceIdx:number) {
+    public updateCameraDir (faceIdx: number) {
         this.node.setRotationFromEuler(cameraDir[faceIdx]);
         if (this._camera) {
             this._camera.update(true);
