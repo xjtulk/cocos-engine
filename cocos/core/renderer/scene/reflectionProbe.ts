@@ -23,11 +23,11 @@
  THE SOFTWARE.
  */
 import { EDITOR } from 'internal:constants';
-import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Quat, Rect, ReflectionProbeManager, RenderPipeline, Root, Texture2D, toRadian, Vec3 } from '../..';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Quat, Rect, ReflectionProbeManager, Root, toRadian, Vec3 } from '../..';
 import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { property } from '../../data/class-decorator';
-import { ccclass, editable, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
+import { ccclass, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
 import { deviceManager, Framebuffer, Texture } from '../../gfx';
 import { BufferTextureCopy, ClearFlagBit, ColorAttachment, DepthStencilAttachment, Format, RenderPassInfo } from '../../gfx/base/define';
@@ -101,7 +101,7 @@ declare const Editor: any;
 @playOnFocus
 export class ReflectionProbe extends Component {
     @serializable
-    protected _generate = false;
+    protected _generate = true;
 
     @serializable
     protected _size = 1024;
@@ -132,19 +132,16 @@ export class ReflectionProbe extends Component {
 
     public realtimeTextures: Texture[] = [];
 
-    private _fullPath = 'D:/cocosProject/cocos-task/TestProject/assets/renderTexture/';
-
     public framebuffer: Framebuffer[] = [];
     public static probeFaceIndex = ProbeFaceIndex;
 
     @readOnly
     @type(CCBoolean)
     set generate (val) {
-        console.log(`generate=====${val}`);
         this._generate = val;
         if (val) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.startCapture();
+            this.capture();
         }
     }
     get generate () {
@@ -164,7 +161,6 @@ export class ReflectionProbe extends Component {
      */
     @type(ProbeResolution)
     set resolution (value: number) {
-        console.log(`resolution = ${value}`);
         this._size = value;
     }
     get resolution () {
@@ -233,22 +229,11 @@ export class ReflectionProbe extends Component {
     }
 
     public onLoad () {
+        ReflectionProbeManager.probeManager.register(this);
         this._createCamera();
     }
 
     public onEnable () {
-        if (!EDITOR) {
-            ReflectionProbeManager.probeManager.register(this);
-        }
-        //attach camera to scene
-        if (!this.node.scene || !this._camera) {
-            return;
-        }
-        if (this._camera && this._camera.scene) {
-            this._camera.scene.removeCamera(this._camera);
-        }
-        const rs = this._getRenderScene();
-        rs.addCamera(this._camera);
     }
     public start () {
         if (!EDITOR) {
@@ -281,17 +266,11 @@ export class ReflectionProbe extends Component {
     public update (dt: number) {
     }
     /* eslint-disable no-await-in-loop */
-    public async startCapture () {
-        // enum FaceIndex {
-        //     right = 0,
-        //     left = 1,
-        //     top = 2,
-        //     bottom = 3,
-        //     front = 4,
-        //     back = 5,
-        // }
+    public async capture () {
+        this._attachCameraToScene();
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
-        const files:string[] = [];
+        const files: string[] = [];
+        const originRotation = this.node.getRotation();
         for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
             this.updateCameraDir(faceIdx);
             const rt = this._createTargetTexture();
@@ -299,33 +278,28 @@ export class ReflectionProbe extends Component {
             await this.waitForNextFrame();
             let pixelData = this.readPixels(rt);
             rt.destroy();
-            pixelData = this.flipImage(pixelData, this._size, this._size);
+            const caps = (legacyCC.director.root as Root).device.capabilities;
+            if (caps.clipSpaceMinZ === -1) {
+                pixelData = this.flipImage(pixelData, this._size, this._size);
+            }
             if (isHDR) {
                 const fileName = `capture_${faceIdx}.data`;
-                const fullPath = this._fullPath + fileName;
-                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {
+                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fileName, (params: any) => {
                     files.push(params);
                 });
             } else {
                 const fileName = `capture_${faceIdx}.png`;
-                const fullPath = this._fullPath + fileName;
-                await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fullPath, (params: any) => {
+                await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fileName, (params: any) => {
                     files.push(params);
                 });
             }
         }
+        this.node.setRotation(originRotation);
+        this._detachCameraFromScene();
         await Editor.Message.request('scene', 'execute-scene-script', {
             name: 'inspector',
             method: 'bakeReflectionProbe',
-            args: [files, isHDR],
-        });
-        this.updateCameraDir(ReflectionProbe.probeFaceIndex.front);
-    }
-    public async waitForNextFrame () {
-        return new Promise<void>((resolve, reject) => {
-            director.once(Director.EVENT_END_FRAME, () => {
-                resolve();
-            });
+            args: [files, isHDR, ReflectionProbeManager.probeManager.getProbeIdx(this)],
         });
     }
 
@@ -336,7 +310,8 @@ export class ReflectionProbe extends Component {
                 name: this.node.name,
                 node: this.node,
                 projection: CameraProjection.PERSPECTIVE,
-                window: legacyCC.director.root && legacyCC.director.root.mainWindow,
+                window: EDITOR ? legacyCC.director.root && legacyCC.director.root.mainWindow
+                    : legacyCC.director.root && legacyCC.director.root.tempWindow,
                 priority: 0,
                 cameraType: CameraType.REFLECTION_PROBE,
                 trackingType: TrackingType.NO_TRACKING,
@@ -356,9 +331,6 @@ export class ReflectionProbe extends Component {
         this._camera.aperture = CameraAperture.F16_0;
         this._camera.shutter = CameraShutter.D125;
         this._camera.iso = CameraISO.ISO100;
-        this._camera.position = this.node.position;
-        this._camera.enabled = true;
-        this._camera.update(true);
         return this._camera;
     }
     private _createTargetTexture () {
@@ -387,6 +359,19 @@ export class ReflectionProbe extends Component {
             const window = rt.window;
             this._camera.changeTargetWindow(window);
             this._camera.setFixedSize(window!.width, window!.height);
+        }
+    }
+
+    private _attachCameraToScene () {
+        if (!this.node.scene || !this._camera) {
+            return;
+        }
+        const rs = this.node.scene.renderScene;
+        rs!.addCamera(this._camera);
+    }
+    private _detachCameraFromScene () {
+        if (this._camera && this._camera.scene) {
+            this._camera.scene.removeCamera(this._camera);
         }
     }
     public readPixels (rt: RenderTexture): Uint8Array | Float32Array | null {
@@ -457,9 +442,15 @@ export class ReflectionProbe extends Component {
             this._camera.update(true);
         }
     }
+    public async waitForNextFrame () {
+        return new Promise<void>((resolve, reject) => {
+            director.once(Director.EVENT_END_FRAME, () => {
+                resolve();
+            });
+        });
+    }
     public isFinishedRendering () {
     }
     public renderProbe () {
-
     }
 }

@@ -38,7 +38,7 @@ import { Light } from '../../renderer/scene/light';
 import { Camera, CameraType } from '../../renderer/scene';
 import { ccclass } from '../../data/decorators';
 import { ReflectionProbeManager } from '../../reflectionProbeManager';
-import { ReflectionProbe } from '../../renderer/scene/reflectionProbe';
+import { ProbeType, ReflectionProbe } from '../../renderer/scene/reflectionProbe';
 import { RenderTexture } from '../..';
 
 /**
@@ -80,6 +80,9 @@ export class ReflectionProbeFlow extends RenderFlow {
 
         for (let i = 0; i < probes.length; i++) {
             const probe = probes[i];
+            if (probe.probeType === ProbeType.BAKE) {
+                continue;
+            }
             if (!probe.isFrameBufferInitFinished()) {
                 this._initFrameBuffer(probe);
             }

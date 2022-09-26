@@ -30,7 +30,10 @@ export class ReflectionProbeManager {
 
     private _probes: ReflectionProbe[] = [];
     public register (probe: ReflectionProbe) {
-        this._probes.push(probe);
+        const index = this._probes.indexOf(probe);
+        if (index === -1) {
+            this._probes.push(probe);
+        }
     }
     public unregister (probe: ReflectionProbe) {
         for (let i = 0; i < this._probes.length; i++) {
@@ -44,13 +47,13 @@ export class ReflectionProbeManager {
         return this._probes;
     }
 
-    public getProbeByCamera (camera: Camera | null) {
+    public getProbeIdx (probe: ReflectionProbe) {
         for (let i = 0; i < this._probes.length; i++) {
-            if (this._probes[i].camera === camera) {
-                return this._probes[i];
+            if (this._probes[i] === probe) {
+                return i;
             }
         }
-        return null;
+        return -1;
     }
     public clearAll () {
         this._probes = [];
