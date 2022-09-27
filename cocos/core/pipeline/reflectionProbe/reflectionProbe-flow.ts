@@ -77,15 +77,11 @@ export class ReflectionProbeFlow extends RenderFlow {
 
         const probes = ReflectionProbeManager.probeManager.getProbes();
         if (probes.length === 0) return;
+        console.log('render===================');
+        console.log(camera);
 
         for (let i = 0; i < probes.length; i++) {
             const probe = probes[i];
-            if (probe.probeType === ProbeType.BAKE) {
-                continue;
-            }
-            if (!probe.isFrameBufferInitFinished()) {
-                this._initFrameBuffer(probe);
-            }
             this._renderStage(probe);
         }
     }
@@ -95,45 +91,25 @@ export class ReflectionProbeFlow extends RenderFlow {
     }
     private _renderStage (probe:ReflectionProbe) {
         for (let i = 0; i < this._stages.length; i++) {
-            //render six face
-            for (let n = 0; n < 6; n++) {
+            const probeStage = this._stages[i] as ReflectionProbeStage;
+            for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
                 //update camera dirction
-                probe.updateCameraDir(n);
-                const probeStage = this._stages[i] as ReflectionProbeStage;
-                const frameBuffer = probe.framebuffer[n];
-                probeStage.setUsageInfo(probe, frameBuffer);
+                probe.updateCameraDir(faceIdx);
+                const renderTexture = probe.bakedTextures[faceIdx];
+                probe.setTargetTexture(renderTexture);
+                probeStage.setUsageInfo(probe, renderTexture.window!.framebuffer);
                 probeStage.render(probe.camera!);
             }
         }
     }
-    private _initFrameBuffer (probe:ReflectionProbe) {
-        const pipeline = this._pipeline as ForwardPipeline;
-        const { device } = pipeline;
-        const format = supportsR32FloatTexture(device) ? Format.R32F : Format.RGBA8;
-        // create six framebuffer to construction cubemap
-        for (let i = 0; i < 6; i++) {
-            const colorAttachment = new ColorAttachment();
-            colorAttachment.format = format;
-
-            const depthStencilAttachment = new DepthStencilAttachment();
-            depthStencilAttachment.format = Format.DEPTH_STENCIL;
-
-            const renderPassInfo = new RenderPassInfo([colorAttachment], depthStencilAttachment);
-            const probeRenderPass = device.createRenderPass(renderPassInfo);
-
-            const renderTexture = device.createTexture(new TextureInfo(
-                TextureType.TEX2D,
-                TextureUsageBit.COLOR_ATTACHMENT | TextureUsageBit.SAMPLED,
-                Format.RGBA8,
-                probe.resolution,
-                probe.resolution,
-            ));
-
-            const framebuffer = device.createFramebuffer(new FramebufferInfo(
-                probeRenderPass,
-                [renderTexture],
-            ));
-            probe.framebuffer.push(framebuffer);
+    private _initRendertexture (probe:ReflectionProbe) {
+        if (probe.bakedTextures.length !== 0) {
+            return;
         }
+        for (let i = 0; i < 6; i++) {
+            const renderTexture = probe.createTargetTexture();
+            probe.bakedTextures.push(renderTexture);
+        }
+        probe.setTargetTexture(probe.bakedTextures[0]);
     }
 }

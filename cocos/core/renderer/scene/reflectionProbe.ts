@@ -24,7 +24,7 @@
  */
 import { EDITOR } from 'internal:constants';
 import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Rect, ReflectionProbeManager, Root, toRadian, Vec3 } from '../..';
-import { RenderTexture } from '../../assets/render-texture';
+import { IRenderTextureCreateInfo, RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { property } from '../../data/class-decorator';
 import { ccclass, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
@@ -33,6 +33,7 @@ import { deviceManager, Framebuffer } from '../../gfx';
 import { BufferTextureCopy, ClearFlagBit, ColorAttachment, DepthStencilAttachment, Format, RenderPassInfo } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
+import { IRenderWindowInfo } from '../core/render-window';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
 
 export const ProbeResolution = Enum({
@@ -104,7 +105,7 @@ export class ReflectionProbe extends Component {
     protected _generate = true;
 
     @serializable
-    protected _size = 512;
+    protected _resolution = 512;
     @serializable
     protected _clearFlag = ProbeClearFlag.SKYBOX;
 
@@ -140,13 +141,15 @@ export class ReflectionProbe extends Component {
      */
     public framebuffer: Framebuffer[] = [];
 
+    public bakedTextures: RenderTexture[] = [];
+
     @readOnly
     @type(CCBoolean)
     set generate (val) {
         this._generate = val;
         if (val) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.capture();
+            this.captureTest();
         }
     }
     get generate () {
@@ -171,10 +174,15 @@ export class ReflectionProbe extends Component {
      */
     @type(ProbeResolution)
     set resolution (value: number) {
-        this._size = value;
+        if (value !== this._resolution) {
+            this.bakedTextures.forEach((rt, idx) => {
+                rt.resize(value, value);
+            });
+        }
+        this._resolution = value;
     }
     get resolution () {
-        return this._size;
+        return this._resolution;
     }
 
     /**
@@ -308,39 +316,73 @@ export class ReflectionProbe extends Component {
      */
     public async capture () {
         this._attachCameraToScene();
+        console.log('capture===================');
+        console.log(this._camera);
         const originRotation = this.node.getRotation();
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
         const caps = (legacyCC.director.root as Root).device.capabilities;
         const files: string[] = [];
         for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
             this.updateCameraDir(faceIdx);
-            const renderTexture = this._createTargetTexture();
-            this._setTargetTexture(renderTexture);
+            const renderTexture = this.createTargetTexture();
+            this.setTargetTexture(renderTexture);
             await this.waitForNextFrame();
             let pixelData = this.readPixels(renderTexture);
             if (caps.clipSpaceMinZ === -1) {
-                pixelData = this.flipImage(pixelData, this._size, this._size);
+                pixelData = this.flipImage(pixelData, this._resolution, this._resolution);
             }
             renderTexture.destroy();
-            if (isHDR) {
-                const fileName = `capture_${faceIdx}.data`;
-                files.push(fileName);
-                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fileName);
-            } else {
-                const fileName = `capture_${faceIdx}.png`;
-                files.push(fileName);
-                await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fileName);
 
-                // await Editor.Message.request('scene', 'execute-scene-script', {
-                //     name: 'inspector',
-                //     method: 'saveDataToImage',
-                //     args: [pixelData, this._size, this._size, fileName],
-                // });
+            const fileName = isHDR ? `capture_${faceIdx}.data` : `capture_${faceIdx}.png`;
+            files.push(fileName);
+            if (isHDR) {
+                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._resolution, this._resolution, fileName);
+            } else {
+                await EditorExtends.Asset.saveDataToImage(pixelData, this._resolution, this._resolution, fileName);
             }
         }
 
         this.node.setRotation(originRotation);
+
+        //use the tool to generate a cubemap
+        await Editor.Message.request('scene', 'execute-scene-script', {
+            name: 'inspector',
+            method: 'bakeReflectionProbe',
+            args: [files, isHDR, this._probeId],
+        });
+    }
+
+    public async captureTest () {
+        this._initBakeTextures();
+        this.setTargetTexture(this.bakedTextures[0]);
+        this._attachCameraToScene();
+        console.log('captureTest===================');
+        console.log(this._camera);
+        const originRotation = this.node.getRotation();
+        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
+        const caps = (legacyCC.director.root as Root).device.capabilities;
+        await this.waitForNextFrame();
         this._detachCameraFromScene();
+        const files: string[] = [];
+        console.log('read pixels=============');
+        for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
+            //this.updateCameraDir(faceIdx);
+            let pixelData = this.readPixels(this.bakedTextures[faceIdx]);
+            //let pixelData = this.readFrameBuffer(this.framebuffer[faceIdx]);
+            if (caps.clipSpaceMinZ === -1) {
+                pixelData = this.flipImage(pixelData, this._resolution, this._resolution);
+            }
+
+            const fileName = isHDR ? `capture_${faceIdx}.data` : `capture_${faceIdx}.png`;
+            files.push(fileName);
+            if (isHDR) {
+                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._resolution, this._resolution, fileName);
+            } else {
+                await EditorExtends.Asset.saveDataToImage(pixelData, this._resolution, this._resolution, fileName);
+            }
+        }
+
+        this.node.setRotation(originRotation);
 
         //use the tool to generate a cubemap
         await Editor.Message.request('scene', 'execute-scene-script', {
@@ -351,6 +393,7 @@ export class ReflectionProbe extends Component {
     }
 
     private _createCamera () {
+        const root = legacyCC.director.root as Root;
         if (!this._camera) {
             this._camera = (legacyCC.director.root as Root).createCamera();
             this._camera.initialize({
@@ -380,9 +423,37 @@ export class ReflectionProbe extends Component {
         this._camera.iso = CameraISO.ISO100;
         return this._camera;
     }
-    private _createTargetTexture () {
-        const width = this._size;
-        const height = this._size;
+    public initCameraWindow () {
+        const root = legacyCC.director.root as Root;
+
+        const colorAttachment = new ColorAttachment();
+        colorAttachment.format = Format.RGBA8;
+        const depthStencilAttachment = new DepthStencilAttachment();
+        depthStencilAttachment.format = Format.DEPTH_STENCIL;
+        const passInfo = new RenderPassInfo([colorAttachment], depthStencilAttachment);
+
+        const windowInfo: IRenderWindowInfo = {
+            width: this._resolution,
+            height: this._resolution,
+            renderPassInfo: passInfo,
+        };
+
+        this._camera!.window = root.createWindow(windowInfo)!;
+    }
+
+    private _initBakeTextures () {
+        if (this.bakedTextures.length !== 0) {
+            return;
+        }
+        for (let i = 0; i < 6; i++) {
+            const renderTexture = this.createTargetTexture();
+            this.bakedTextures.push(renderTexture);
+        }
+    }
+
+    public createTargetTexture () {
+        const width = this._resolution;
+        const height = this._resolution;
         const rt = new RenderTexture();
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
         if (isHDR) {
@@ -398,7 +469,7 @@ export class ReflectionProbe extends Component {
         return rt;
     }
 
-    private _setTargetTexture (rt: RenderTexture) {
+    public setTargetTexture (rt: RenderTexture) {
         if (!this._camera) {
             return;
         }
@@ -425,6 +496,42 @@ export class ReflectionProbe extends Component {
 
     public getProbeId () {
         return this._probeId;
+    }
+
+    public readFrameBuffer (frameBuffer: Framebuffer): Uint8Array | Float32Array | null {
+        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
+
+        const width = frameBuffer.colorTextures[0]?.width;
+        const height = frameBuffer.colorTextures[0]?.height;
+
+        const needSize = 4 * width! * height!;
+        let buffer: Uint8Array | Float32Array;
+        if (isHDR) {
+            buffer = new Float32Array(needSize);
+        } else {
+            buffer = new Uint8Array(needSize);
+        }
+
+        const gfxTexture = frameBuffer.colorTextures[0];
+        if (!gfxTexture) {
+            return null;
+        }
+
+        const gfxDevice = deviceManager.gfxDevice;
+
+        const bufferViews: ArrayBufferView[] = [];
+        const regions: BufferTextureCopy[] = [];
+
+        const region0 = new BufferTextureCopy();
+        region0.texOffset.x = 0;
+        region0.texOffset.y = 0;
+        region0.texExtent.width = width!;
+        region0.texExtent.height = height!;
+        regions.push(region0);
+
+        bufferViews.push(buffer);
+        gfxDevice?.copyTextureToBuffers(gfxTexture, bufferViews, regions);
+        return buffer;
     }
 
     public readPixels (rt: RenderTexture): Uint8Array | Float32Array | null {
@@ -507,8 +614,5 @@ export class ReflectionProbe extends Component {
     }
 
     public isFinishedRendering () {
-    }
-
-    public renderProbe () {
     }
 }
