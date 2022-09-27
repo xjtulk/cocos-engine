@@ -22,7 +22,6 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-import { Camera } from './components';
 import { ReflectionProbe } from './renderer/scene/reflectionProbe';
 
 export class ReflectionProbeManager {

@@ -51,8 +51,8 @@ interface EditorExtendsComponent {
 interface EditorExtendsAsset {
     queryAssetInfo(uuid: string, callback: Function): any;
     getAssetInfoFromUrl(url: string): EditorAssetInfo;
-    saveDataToImage(buffer: Uint8Array | Float32Array | null, width: number, height: number, fullpath: string, callback: Function): any;
-    saveHDRDataToImage(buffer: Uint8Array | Float32Array | null, width: number, height: number, fullpath: string, callback: Function): any;
+    saveDataToImage(buffer: Uint8Array | Float32Array | null, width: number, height: number, fullpath: string): any;
+    saveHDRDataToImage(buffer: Uint8Array | Float32Array | null, width: number, height: number, fullpath: string): any;
 }
 
 interface EditorExtendsUuid {

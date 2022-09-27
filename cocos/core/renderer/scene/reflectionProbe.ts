@@ -324,14 +324,18 @@ export class ReflectionProbe extends Component {
             renderTexture.destroy();
             if (isHDR) {
                 const fileName = `capture_${faceIdx}.data`;
-                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fileName, (params: any) => {
-                    files.push(params);
-                });
+                files.push(fileName);
+                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._size, this._size, fileName);
             } else {
                 const fileName = `capture_${faceIdx}.png`;
-                await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fileName, (params: any) => {
-                    files.push(params);
-                });
+                files.push(fileName);
+                await EditorExtends.Asset.saveDataToImage(pixelData, this._size, this._size, fileName);
+
+                // await Editor.Message.request('scene', 'execute-scene-script', {
+                //     name: 'inspector',
+                //     method: 'saveDataToImage',
+                //     args: [pixelData, this._size, this._size, fileName],
+                // });
             }
         }
 
