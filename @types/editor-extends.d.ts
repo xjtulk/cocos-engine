@@ -53,6 +53,7 @@ interface EditorExtendsAsset {
     getAssetInfoFromUrl(url: string): EditorAssetInfo;
     saveDataToImage(buffer: Uint8Array | Float32Array | null, width: number, height: number, fullpath: string): any;
     saveHDRDataToImage(buffer: Uint8Array | Float32Array | null, width: number, height: number, fullpath: string): any;
+    bakeReflectionProbe(files: string[], isHDR: boolean, probeID: number, callback: Function): any
 }
 
 interface EditorExtendsUuid {

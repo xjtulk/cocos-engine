@@ -136,8 +136,9 @@ export function sceneCulling (pipeline: RenderPipeline, camera: Camera) {
     const csmLayerObjects = csmLayers.layerObjects;
     csmLayerObjects.clear();
 
-    const probeRenderObjects = ReflectionProbeManager.probeManager.renderObjects;
-    probeRenderObjects.length = 0;
+    if (camera.cameraType === CameraType.REFLECTION_PROBE) {
+        ReflectionProbeManager.probeManager.clearRenderObject(camera);
+    }
 
     if (shadows.enabled) {
         pipeline.pipelineUBO.updateShadowUBORange(UBOShadow.SHADOW_COLOR_OFFSET, shadows.shadowColor);
@@ -151,7 +152,9 @@ export function sceneCulling (pipeline: RenderPipeline, camera: Camera) {
 
     if (skybox.enabled && skybox.model && (camera.clearFlag & SKYBOX_FLAG)) {
         renderObjects.push(getRenderObject(skybox.model, camera));
-        probeRenderObjects.push(getRenderObject(skybox.model, camera));
+        if (camera.cameraType === CameraType.REFLECTION_PROBE) {
+            ReflectionProbeManager.probeManager.addRenderObject(camera, getRenderObject(skybox.model, camera));
+        }
     }
 
     const models = scene.models;
@@ -168,9 +171,9 @@ export function sceneCulling (pipeline: RenderPipeline, camera: Camera) {
             }
 
             if (model.node && ((visibility & model.node.layer) === model.node.layer)
-                 || (visibility & model.visFlags)) {
+                  || (visibility & model.visFlags)) {
                 if (camera.cameraType === CameraType.REFLECTION_PROBE) {
-                    probeRenderObjects.push(getRenderObject(model, camera));
+                    ReflectionProbeManager.probeManager.addRenderObject(camera, getRenderObject(model, camera));
                 }
                 // frustum culling
                 if (model.worldBounds && !intersect.aabbFrustum(model.worldBounds, camera.frustum)) {

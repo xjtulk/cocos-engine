@@ -32,7 +32,7 @@ import { Director, director } from '../../director';
 import { deviceManager, Framebuffer } from '../../gfx';
 import { BufferTextureCopy, ClearFlagBit, ColorAttachment, DepthStencilAttachment, Format, RenderPassInfo } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
-import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
+import { CAMERA_DEFAULT_MASK, IRenderObject } from '../../pipeline/define';
 import { IRenderWindowInfo } from '../core/render-window';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
 
@@ -95,7 +95,6 @@ enum ProbeFaceIndex {
     front = 4,
     back = 5,
 }
-declare const Editor: any;
 @ccclass('cc.ReflectionProbe')
 @menu('Rendering/ReflectionProbe')
 @executeInEditMode
@@ -126,16 +125,19 @@ export class ReflectionProbe extends Component {
     @serializable
     protected _fov = 90;
 
+    @serializable
+    protected _cubeFilePath = '';
+
     public static probeFaceIndex = ProbeFaceIndex;
     public static probeId = 0;
+
+    public bakedTextures: RenderTexture[] = [];
+    public renderObjects: IRenderObject[] = [];
 
     private _camera: Camera | null = null;
     private _probeId = ReflectionProbe.probeId;
 
     private _originRotation = Quat.IDENTITY;
-
-    public bakedTextures: RenderTexture[] = [];
-
     private _needRefresh = false;
 
     @readOnly
@@ -283,6 +285,8 @@ export class ReflectionProbe extends Component {
             this.setTargetTexture(this.bakedTextures[0]);
         }
         this._originRotation = this.node.getRotation();
+
+        console.log(`start === ${this._cubeFilePath}`);
     }
 
     public onDestroy () {
@@ -321,10 +325,8 @@ export class ReflectionProbe extends Component {
             }
         }
         //use the tool to generate a cubemap and save to asset directory
-        await Editor.Message.request('scene', 'execute-scene-script', {
-            name: 'inspector',
-            method: 'bakeReflectionProbe',
-            args: [files, isHDR, this._probeId],
+        await EditorExtends.Asset.bakeReflectionProbe(files, isHDR, this._probeId, (path:string) => {
+            this._cubeFilePath = path;
         });
     }
     public async renderProbe () {

@@ -71,15 +71,16 @@ export class RenderReflectionProbeQueue {
         this._pipeline = pipeline;
     }
 
-    public gatherRenderPasses (camera: Camera, cmdBuff: CommandBuffer) {
+    public gatherRenderObjects (camera: Camera) {
         this.clear();
-        const renderObjects = ReflectionProbeManager.probeManager.renderObjects;
+        const renderObjects = ReflectionProbeManager.probeManager.getRenderObjects(camera);
+        if (renderObjects === undefined) {
+            return;
+        }
         for (let i = 0; i < renderObjects.length; i++) {
             const ro = renderObjects[i];
             const model = ro.model;
-            if (ro.model.bakeToProbe) {
-                this.add(model);
-            }
+            this.add(model);
         }
     }
 

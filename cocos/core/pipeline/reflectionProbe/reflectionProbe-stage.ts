@@ -96,7 +96,7 @@ export class ReflectionProbeStage extends RenderStage {
     public render (camera: Camera) {
         const pipeline = this._pipeline;
         const cmdBuff = pipeline.commandBuffers[0];
-        this._probeRenderQueue.gatherRenderPasses(camera, cmdBuff);
+        this._probeRenderQueue.gatherRenderObjects(camera);
         pipeline.pipelineUBO.updateCameraUBO(camera);
 
         this._renderArea.x = 0;

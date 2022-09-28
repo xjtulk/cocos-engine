@@ -23,13 +23,13 @@
  THE SOFTWARE.
  */
 import { IRenderObject } from './pipeline/define';
+import { Camera } from './renderer/scene/camera';
 import { ReflectionProbe } from './renderer/scene/reflectionProbe';
 
 export class ReflectionProbeManager {
     public static probeManager: ReflectionProbeManager;
 
     private _probes: ReflectionProbe[] = [];
-    public renderObjects: IRenderObject[] = [];
     public register (probe: ReflectionProbe) {
         const index = this._probes.indexOf(probe);
         if (index === -1) {
@@ -49,6 +49,36 @@ export class ReflectionProbeManager {
     }
     public clearAll () {
         this._probes = [];
+    }
+    public getProbeByCamera (camera:Camera) {
+        for (let i = 0; i < this._probes.length; i++) {
+            const probe = this._probes[i];
+            if (probe.camera === camera) {
+                return probe;
+            }
+        }
+        return null;
+    }
+    public addRenderObject (camera: Camera, obj: IRenderObject) {
+        const probe = this.getProbeByCamera(camera);
+        if (probe) {
+            if (obj.model.bakeToProbe) {
+                probe.renderObjects.push(obj);
+            }
+        }
+    }
+    public clearRenderObject (camera: Camera) {
+        const probe = this.getProbeByCamera(camera);
+        if (probe) {
+            probe.renderObjects = [];
+        }
+    }
+    public getRenderObjects (camera: Camera) {
+        const probe = this.getProbeByCamera(camera);
+        if (probe) {
+            return probe.renderObjects;
+        }
+        return [];
     }
 }
 
