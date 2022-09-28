@@ -134,12 +134,6 @@ export class ReflectionProbe extends Component {
 
     private _originRotation = Quat.IDENTITY;
 
-    /**
-     * @en Renders 6 faces to Framebuffer at runtime
-     * @zh 运行时会把6个面渲染至Framebuffer。
-     */
-    public framebuffer: Framebuffer[] = [];
-
     public bakedTextures: RenderTexture[] = [];
 
     @readOnly
@@ -148,7 +142,7 @@ export class ReflectionProbe extends Component {
         this._generate = val;
         if (val) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            this.captureTest();
+            this.capture();
         }
     }
     get generate () {
@@ -278,7 +272,7 @@ export class ReflectionProbe extends Component {
     public start () {
         if (this.bakedTextures.length === 0) {
             for (let i = 0; i < 6; i++) {
-                const renderTexture = this.createTargetTexture();
+                const renderTexture = this._createTargetTexture();
                 this.bakedTextures.push(renderTexture);
             }
             this.setTargetTexture(this.bakedTextures[0]);
@@ -291,21 +285,10 @@ export class ReflectionProbe extends Component {
             this._camera.destroy();
             this._camera = null;
         }
-        for (let i = 0; i < this.framebuffer.length; i++) {
-            const frameBuffer = this.framebuffer[i];
-            if (!frameBuffer) { continue; }
-            const renderTargets = frameBuffer.colorTextures;
-            for (let j = 0; j < renderTargets.length; j++) {
-                const renderTarget = renderTargets[j];
-                if (renderTarget) { renderTarget.destroy(); }
-            }
-            frameBuffer.renderPass.destroy();
-            frameBuffer.destroy();
+        for (let i = 0; i < this.bakedTextures.length; i++) {
+            this.bakedTextures[i].destroy();
         }
-        this.framebuffer = [];
-    }
-
-    public update (dt: number) {
+        this.bakedTextures = [];
     }
 
     /* eslint-disable no-await-in-loop */
@@ -313,7 +296,7 @@ export class ReflectionProbe extends Component {
      * @en Render the six faces of the Probe and use the tool to generate a cubemap and save it to the asset directory.
      * @zh 渲染Probe的6个面，并且使用工具生成cubemap保存至asset目录。
      */
-    public async captureTest () {
+    public async capture () {
         await this.renderProbe();
         //Save rendertexture data to the resource directory
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
@@ -379,7 +362,7 @@ export class ReflectionProbe extends Component {
         return this._camera;
     }
 
-    public createTargetTexture () {
+    private _createTargetTexture () {
         const width = this._resolution;
         const height = this._resolution;
         const rt = new RenderTexture();
@@ -424,42 +407,6 @@ export class ReflectionProbe extends Component {
 
     public getProbeId () {
         return this._probeId;
-    }
-
-    public readFrameBuffer (frameBuffer: Framebuffer): Uint8Array | Float32Array | null {
-        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
-
-        const width = frameBuffer.colorTextures[0]?.width;
-        const height = frameBuffer.colorTextures[0]?.height;
-
-        const needSize = 4 * width! * height!;
-        let buffer: Uint8Array | Float32Array;
-        if (isHDR) {
-            buffer = new Float32Array(needSize);
-        } else {
-            buffer = new Uint8Array(needSize);
-        }
-
-        const gfxTexture = frameBuffer.colorTextures[0];
-        if (!gfxTexture) {
-            return null;
-        }
-
-        const gfxDevice = deviceManager.gfxDevice;
-
-        const bufferViews: ArrayBufferView[] = [];
-        const regions: BufferTextureCopy[] = [];
-
-        const region0 = new BufferTextureCopy();
-        region0.texOffset.x = 0;
-        region0.texOffset.y = 0;
-        region0.texExtent.width = width!;
-        region0.texExtent.height = height!;
-        regions.push(region0);
-
-        bufferViews.push(buffer);
-        gfxDevice?.copyTextureToBuffers(gfxTexture, bufferViews, regions);
-        return buffer;
     }
 
     public readPixels (rt: RenderTexture): Uint8Array | Float32Array | null {
@@ -520,10 +467,6 @@ export class ReflectionProbe extends Component {
             }
         }
         return newData;
-    }
-
-    public isFrameBufferInitFinished () {
-        return this.framebuffer.length === 6;
     }
 
     public updateCameraDir (faceIdx: number) {
