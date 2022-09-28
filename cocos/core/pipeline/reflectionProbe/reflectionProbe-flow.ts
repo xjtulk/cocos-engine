@@ -77,8 +77,9 @@ export class ReflectionProbeFlow extends RenderFlow {
         const probes = ReflectionProbeManager.probeManager.getProbes();
         for (let i = 0; i < probes.length; i++) {
             const probe = probes[i];
-            if (probe.camera === camera) {
+            if (probe.needRefresh) {
                 this._renderStage(probe);
+                console.log(`render probe id = ${probe.getProbeId()}`);
                 break;
             }
         }

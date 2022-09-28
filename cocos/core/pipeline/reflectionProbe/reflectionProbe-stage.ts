@@ -47,7 +47,7 @@ export class ReflectionProbeStage extends RenderStage {
      */
     public static initInfo: IRenderStageInfo = {
         name: 'ReflectionProbeStage',
-        priority: 11,
+        priority: ForwardStagePriority.FORWARD,
         tag: 0,
     };
 

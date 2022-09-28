@@ -279,6 +279,18 @@ export class Model {
     }
 
     /**
+     * @en Whether the model can be render by the reflection probe
+     * @zh 模型是否能被反射探针渲染
+     */
+    get bakeToProbe () {
+        return this._bakeToProbe;
+    }
+
+    set bakeToProbe (val) {
+        this._bakeToProbe = val;
+    }
+
+    /**
      * @en The type of the model
      * @zh 模型类型
      */
@@ -425,6 +437,12 @@ export class Model {
     protected _visFlags = Layers.Enum.NONE;
 
     protected _priority = 0;
+
+    /**
+     * @en Whether the model can be render by the reflection probe
+     * @zh 模型是否能被反射探针渲染
+     */
+    protected _bakeToProbe = true;
 
     /**
      * @internal

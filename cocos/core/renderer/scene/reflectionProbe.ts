@@ -136,6 +136,8 @@ export class ReflectionProbe extends Component {
 
     public bakedTextures: RenderTexture[] = [];
 
+    private _needRefresh = false;
+
     @readOnly
     @type(CCBoolean)
     set generate (val) {
@@ -259,6 +261,9 @@ export class ReflectionProbe extends Component {
     get camera () {
         return this._camera;
     }
+    get needRefresh () {
+        return this._needRefresh;
+    }
 
     public onLoad () {
         this._probeId = ReflectionProbe.probeId++;
@@ -324,8 +329,10 @@ export class ReflectionProbe extends Component {
     }
     public async renderProbe () {
         this._attachCameraToScene();
+        this._needRefresh = true;
         await this.waitForNextFrame();
         this._detachCameraFromScene();
+        this._needRefresh = false;
         //reset rotation
         this.node.setRotation(this._originRotation);
     }

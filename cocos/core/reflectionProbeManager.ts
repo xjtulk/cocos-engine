@@ -22,12 +22,14 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+import { IRenderObject } from './pipeline/define';
 import { ReflectionProbe } from './renderer/scene/reflectionProbe';
 
 export class ReflectionProbeManager {
     public static probeManager: ReflectionProbeManager;
 
     private _probes: ReflectionProbe[] = [];
+    public renderObjects: IRenderObject[] = [];
     public register (probe: ReflectionProbe) {
         const index = this._probes.indexOf(probe);
         if (index === -1) {

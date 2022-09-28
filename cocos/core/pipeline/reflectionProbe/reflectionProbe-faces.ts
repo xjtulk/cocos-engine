@@ -262,7 +262,7 @@ export class ReflectionProbeFace extends ReflectionProbeVolume {
  */
 export class ReflectionProbeFaces {
     protected _castShadowObjects: IRenderObject[] = [];
-    protected _layerObjects = new CachedArray<IRenderObject>(64);
+    protected _ObjectsInRange = new CachedArray<IRenderObject>(64);
 
     protected _layers: ReflectionProbeFace[] = [];
     // LevelCount is a scalar, Indicates the number.
@@ -275,8 +275,8 @@ export class ReflectionProbeFaces {
         return this._castShadowObjects;
     }
 
-    get layerObjects () {
-        return this._layerObjects;
+    get ObjectsInRange () {
+        return this._ObjectsInRange;
     }
 
     get layers () {

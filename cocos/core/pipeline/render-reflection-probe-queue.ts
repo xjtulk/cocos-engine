@@ -28,13 +28,12 @@ import { SetIndex } from './define';
 import { Device, RenderPass, Shader, CommandBuffer } from '../gfx';
 import { getPhaseID } from './pass-phase';
 import { PipelineStateManager } from './pipeline-state-manager';
-import { Pass, BatchingSchemes } from '../renderer/core/pass';
-import { RenderInstancedQueue } from './render-instanced-queue';
-import { RenderBatchedQueue } from './render-batched-queue';
+import { Pass } from '../renderer/core/pass';
 
 import { Model } from '../renderer/scene/model';
 import { Camera } from '../renderer/scene';
 import { PipelineRuntime } from './custom/pipeline';
+import { ReflectionProbeManager } from '../reflectionProbeManager';
 
 const _phaseID = getPhaseID('default');
 const _phaseReflectMapID = getPhaseID('reflect-map');
@@ -60,74 +59,50 @@ function getReflectMapPassIndex (subModel: SubModel) : number {
 
 /**
  * @zh
- * 阴影渲染队列
+ * 反射探针渲染队列
  */
 export class RenderReflectionProbeQueue {
     private _pipeline: PipelineRuntime;
     private _subModelsArray: SubModel[] = [];
     private _passArray: Pass[] = [];
     private _shaderArray: Shader[] = [];
-    private _instancedQueue: RenderInstancedQueue;
-    private _batchedQueue: RenderBatchedQueue;
 
     public constructor (pipeline: PipelineRuntime) {
         this._pipeline = pipeline;
-        this._instancedQueue = new RenderInstancedQueue();
-        this._batchedQueue = new RenderBatchedQueue();
     }
 
     public gatherRenderPasses (camera: Camera, cmdBuff: CommandBuffer) {
         this.clear();
-        const sceneData = this._pipeline.pipelineSceneData;
-        const renderObjects = sceneData.renderObjects;
+        const renderObjects = ReflectionProbeManager.probeManager.renderObjects;
         for (let i = 0; i < renderObjects.length; i++) {
             const ro = renderObjects[i];
             const model = ro.model;
-            this.add(model);
+            if (ro.model.bakeToProbe) {
+                this.add(model);
+            }
         }
-        this._instancedQueue.uploadBuffers(cmdBuff);
-        this._batchedQueue.uploadBuffers(cmdBuff);
     }
 
-    /**
-     * @zh
-     * clear light-Batched-Queue
-     */
     public clear () {
         this._subModelsArray.length = 0;
         this._shaderArray.length = 0;
         this._passArray.length = 0;
-        this._instancedQueue.clear();
-        this._batchedQueue.clear();
     }
 
     public add (model: Model) {
         const subModels = model.subModels;
         for (let j = 0; j < subModels.length; j++) {
             const subModel = subModels[j];
-            const shadowPassIdx = getPassIndex(subModel);
-            if (shadowPassIdx < 0) { continue; }
-
+            const defaultPassIdx = getPassIndex(subModel);
+            if (defaultPassIdx < 0) { continue; }
             // const reflectProbePassIdx = getReflectMapPassIndex(subModel);
             // if (shadowPassIdx < 0) {
             // }
-            const pass = subModel.passes[shadowPassIdx];
-            const batchingScheme = pass.batchingScheme;
-
-            if (batchingScheme === BatchingSchemes.INSTANCING) {            // instancing
-                const buffer = pass.getInstancedBuffer();
-                buffer.merge(subModel, model.instancedAttributes, shadowPassIdx);
-                this._instancedQueue.queue.add(buffer);
-            } else if (pass.batchingScheme === BatchingSchemes.VB_MERGING) { // vb-merging
-                const buffer = pass.getBatchedBuffer();
-                buffer.merge(subModel, shadowPassIdx, model);
-                this._batchedQueue.queue.add(buffer);
-            } else {
-                const shader = subModel.shaders[shadowPassIdx];
-                this._subModelsArray.push(subModel);
-                if (shader) this._shaderArray.push(shader);
-                this._passArray.push(pass);
-            }
+            const pass = subModel.passes[defaultPassIdx];
+            const shader = subModel.shaders[defaultPassIdx];
+            this._subModelsArray.push(subModel);
+            if (shader) this._shaderArray.push(shader);
+            this._passArray.push(pass);
         }
     }
 
@@ -136,9 +111,6 @@ export class RenderReflectionProbeQueue {
      * record CommandBuffer
      */
     public recordCommandBuffer (device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer) {
-        this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
-        this._batchedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
-
         for (let i = 0; i < this._subModelsArray.length; ++i) {
             const subModel = this._subModelsArray[i];
             const shader = this._shaderArray[i];

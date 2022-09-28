@@ -40,7 +40,7 @@ import { ModelRenderer } from '../../core/components/model-renderer';
 import { MorphRenderingInstance } from '../assets/morph-rendering';
 import { legacyCC } from '../../core/global-exports';
 import { assertIsTrue } from '../../core/data/utils/asserts';
-import { CCFloat } from '../../core/data/utils/attribute';
+import { CCBoolean, CCFloat } from '../../core/data/utils/attribute';
 import { property } from '../../core/data/class-decorator';
 
 /**
@@ -198,6 +198,9 @@ export class MeshRenderer extends ModelRenderer {
     @serializable
     protected _shadowNormalBias = 0;
 
+    @serializable
+    protected _bakeToProbe = true;
+
     // @serializable
     private _subMeshShapesWeights: number[][] = [];
 
@@ -296,6 +299,20 @@ export class MeshRenderer extends ModelRenderer {
         }
         this._updateCastShadow();
         this._updateReceiveShadow();
+    }
+
+    /**
+     * @en Whether the model can be render by the reflection probe
+     * @zh 模型是否能被反射探针渲染
+     */
+    @type(CCBoolean)
+    get bakeToProbe () {
+        return this._bakeToProbe;
+    }
+
+    set bakeToProbe (val) {
+        this._bakeToProbe = val;
+        this._model!.bakeToProbe = val;
     }
 
     /**

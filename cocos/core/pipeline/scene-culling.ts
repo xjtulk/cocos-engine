@@ -25,7 +25,7 @@
 
 import { intersect, Sphere } from '../geometry';
 import { Model } from '../renderer/scene/model';
-import { Camera, SKYBOX_FLAG } from '../renderer/scene/camera';
+import { Camera, CameraType, SKYBOX_FLAG } from '../renderer/scene/camera';
 import { Vec3 } from '../math';
 import { RenderPipeline } from './render-pipeline';
 import { Pool } from '../memop';
@@ -33,6 +33,7 @@ import { IRenderObject, UBOShadow } from './define';
 import { ShadowType, Shadows, CSMOptimizationMode } from '../renderer/scene/shadows';
 import { PipelineSceneData } from './pipeline-scene-data';
 import { ShadowLayerVolume } from './shadow/csm-layers';
+import { ReflectionProbeManager } from '../reflectionProbeManager';
 
 const _tempVec3 = new Vec3();
 const _sphere = Sphere.create(0, 0, 0, 1);
@@ -135,6 +136,9 @@ export function sceneCulling (pipeline: RenderPipeline, camera: Camera) {
     const csmLayerObjects = csmLayers.layerObjects;
     csmLayerObjects.clear();
 
+    const probeRenderObjects = ReflectionProbeManager.probeManager.renderObjects;
+    probeRenderObjects.length = 0;
+
     if (shadows.enabled) {
         pipeline.pipelineUBO.updateShadowUBORange(UBOShadow.SHADOW_COLOR_OFFSET, shadows.shadowColor);
         if (shadows.type === ShadowType.ShadowMap) {
@@ -147,6 +151,7 @@ export function sceneCulling (pipeline: RenderPipeline, camera: Camera) {
 
     if (skybox.enabled && skybox.model && (camera.clearFlag & SKYBOX_FLAG)) {
         renderObjects.push(getRenderObject(skybox.model, camera));
+        probeRenderObjects.push(getRenderObject(skybox.model, camera));
     }
 
     const models = scene.models;
@@ -164,6 +169,9 @@ export function sceneCulling (pipeline: RenderPipeline, camera: Camera) {
 
             if (model.node && ((visibility & model.node.layer) === model.node.layer)
                  || (visibility & model.visFlags)) {
+                if (camera.cameraType === CameraType.REFLECTION_PROBE) {
+                    probeRenderObjects.push(getRenderObject(model, camera));
+                }
                 // frustum culling
                 if (model.worldBounds && !intersect.aabbFrustum(model.worldBounds, camera.frustum)) {
                     continue;
