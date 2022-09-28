@@ -74,15 +74,13 @@ export class ReflectionProbeFlow extends RenderFlow {
 
     public render (camera: Camera) {
         if (camera.cameraType !== CameraType.REFLECTION_PROBE) return;
-
         const probes = ReflectionProbeManager.probeManager.getProbes();
-        if (probes.length === 0) return;
-        console.log('render===================');
-        console.log(camera);
-
         for (let i = 0; i < probes.length; i++) {
             const probe = probes[i];
-            this._renderStage(probe);
+            if (probe.camera === camera) {
+                this._renderStage(probe);
+                break;
+            }
         }
     }
 
@@ -101,15 +99,5 @@ export class ReflectionProbeFlow extends RenderFlow {
                 probeStage.render(probe.camera!);
             }
         }
-    }
-    private _initRendertexture (probe:ReflectionProbe) {
-        if (probe.bakedTextures.length !== 0) {
-            return;
-        }
-        for (let i = 0; i < 6; i++) {
-            const renderTexture = probe.createTargetTexture();
-            probe.bakedTextures.push(renderTexture);
-        }
-        probe.setTargetTexture(probe.bakedTextures[0]);
     }
 }

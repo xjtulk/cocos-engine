@@ -23,7 +23,7 @@
  THE SOFTWARE.
  */
 import { EDITOR } from 'internal:constants';
-import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Rect, ReflectionProbeManager, Root, toRadian, Vec3 } from '../..';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Quat, Rect, ReflectionProbeManager, Root, toRadian, Vec3 } from '../..';
 import { IRenderTextureCreateInfo, RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { property } from '../../data/class-decorator';
@@ -126,14 +126,13 @@ export class ReflectionProbe extends Component {
     @serializable
     protected _fov = 90;
 
-    @property([Material])
-    materials: Material[] = [];
-
     public static probeFaceIndex = ProbeFaceIndex;
     public static probeId = 0;
 
     private _camera: Camera | null = null;
     private _probeId = ReflectionProbe.probeId;
+
+    private _originRotation = Quat.IDENTITY;
 
     /**
      * @en Renders 6 faces to Framebuffer at runtime
@@ -277,14 +276,14 @@ export class ReflectionProbe extends Component {
     }
 
     public start () {
-        if (!EDITOR) {
-            this.scheduleOnce(() => {
-                for (let i = 0; i < this.materials.length; i++) {
-                    const mat = this.materials[i];
-                    mat.setProperty('mainTexture', this.framebuffer[i].colorTextures[0]);
-                }
-            }, 1.0);
+        if (this.bakedTextures.length === 0) {
+            for (let i = 0; i < 6; i++) {
+                const renderTexture = this.createTargetTexture();
+                this.bakedTextures.push(renderTexture);
+            }
+            this.setTargetTexture(this.bakedTextures[0]);
         }
+        this._originRotation = this.node.getRotation();
     }
 
     public onDestroy () {
@@ -314,82 +313,38 @@ export class ReflectionProbe extends Component {
      * @en Render the six faces of the Probe and use the tool to generate a cubemap and save it to the asset directory.
      * @zh 渲染Probe的6个面，并且使用工具生成cubemap保存至asset目录。
      */
-    public async capture () {
-        this._attachCameraToScene();
-        console.log('capture===================');
-        console.log(this._camera);
-        const originRotation = this.node.getRotation();
+    public async captureTest () {
+        await this.renderProbe();
+        //Save rendertexture data to the resource directory
         const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
         const caps = (legacyCC.director.root as Root).device.capabilities;
         const files: string[] = [];
         for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
-            this.updateCameraDir(faceIdx);
-            const renderTexture = this.createTargetTexture();
-            this.setTargetTexture(renderTexture);
-            await this.waitForNextFrame();
-            let pixelData = this.readPixels(renderTexture);
+            const fileName = isHDR ? `capture_${faceIdx}.data` : `capture_${faceIdx}.png`;
+            files.push(fileName);
+            let pixelData = this.readPixels(this.bakedTextures[faceIdx]);
             if (caps.clipSpaceMinZ === -1) {
                 pixelData = this.flipImage(pixelData, this._resolution, this._resolution);
             }
-            renderTexture.destroy();
-
-            const fileName = isHDR ? `capture_${faceIdx}.data` : `capture_${faceIdx}.png`;
-            files.push(fileName);
             if (isHDR) {
                 await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._resolution, this._resolution, fileName);
             } else {
                 await EditorExtends.Asset.saveDataToImage(pixelData, this._resolution, this._resolution, fileName);
             }
         }
-
-        this.node.setRotation(originRotation);
-
-        //use the tool to generate a cubemap
+        //use the tool to generate a cubemap and save to asset directory
         await Editor.Message.request('scene', 'execute-scene-script', {
             name: 'inspector',
             method: 'bakeReflectionProbe',
             args: [files, isHDR, this._probeId],
         });
     }
-
-    public async captureTest () {
-        this._initBakeTextures();
-        this.setTargetTexture(this.bakedTextures[0]);
+    public async renderProbe () {
         this._attachCameraToScene();
-        console.log('captureTest===================');
-        console.log(this._camera);
-        const originRotation = this.node.getRotation();
-        const isHDR = (legacyCC.director.root as Root).pipeline.pipelineSceneData.isHDR;
-        const caps = (legacyCC.director.root as Root).device.capabilities;
         await this.waitForNextFrame();
         this._detachCameraFromScene();
-        const files: string[] = [];
-        console.log('read pixels=============');
-        for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
-            //this.updateCameraDir(faceIdx);
-            let pixelData = this.readPixels(this.bakedTextures[faceIdx]);
-            //let pixelData = this.readFrameBuffer(this.framebuffer[faceIdx]);
-            if (caps.clipSpaceMinZ === -1) {
-                pixelData = this.flipImage(pixelData, this._resolution, this._resolution);
-            }
-
-            const fileName = isHDR ? `capture_${faceIdx}.data` : `capture_${faceIdx}.png`;
-            files.push(fileName);
-            if (isHDR) {
-                await EditorExtends.Asset.saveHDRDataToImage(pixelData, this._resolution, this._resolution, fileName);
-            } else {
-                await EditorExtends.Asset.saveDataToImage(pixelData, this._resolution, this._resolution, fileName);
-            }
-        }
-
-        this.node.setRotation(originRotation);
-
-        //use the tool to generate a cubemap
-        await Editor.Message.request('scene', 'execute-scene-script', {
-            name: 'inspector',
-            method: 'bakeReflectionProbe',
-            args: [files, isHDR, this._probeId],
-        });
+        //reset rotation
+        this.node.setRotation(this._originRotation);
     }
 
     private _createCamera () {
@@ -422,33 +377,6 @@ export class ReflectionProbe extends Component {
         this._camera.shutter = CameraShutter.D125;
         this._camera.iso = CameraISO.ISO100;
         return this._camera;
-    }
-    public initCameraWindow () {
-        const root = legacyCC.director.root as Root;
-
-        const colorAttachment = new ColorAttachment();
-        colorAttachment.format = Format.RGBA8;
-        const depthStencilAttachment = new DepthStencilAttachment();
-        depthStencilAttachment.format = Format.DEPTH_STENCIL;
-        const passInfo = new RenderPassInfo([colorAttachment], depthStencilAttachment);
-
-        const windowInfo: IRenderWindowInfo = {
-            width: this._resolution,
-            height: this._resolution,
-            renderPassInfo: passInfo,
-        };
-
-        this._camera!.window = root.createWindow(windowInfo)!;
-    }
-
-    private _initBakeTextures () {
-        if (this.bakedTextures.length !== 0) {
-            return;
-        }
-        for (let i = 0; i < 6; i++) {
-            const renderTexture = this.createTargetTexture();
-            this.bakedTextures.push(renderTexture);
-        }
     }
 
     public createTargetTexture () {
@@ -614,5 +542,6 @@ export class ReflectionProbe extends Component {
     }
 
     public isFinishedRendering () {
+        return true;
     }
 }
