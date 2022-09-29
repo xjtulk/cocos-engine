@@ -369,6 +369,7 @@ export class MeshRenderer extends ModelRenderer {
         this._updateReceiveShadow();
         this._updateShadowBias();
         this._updateShadowNormalBias();
+        this._updateBakeToProbe();
     }
 
     // Redo, Undo, Prefab restore, etc.
@@ -381,6 +382,7 @@ export class MeshRenderer extends ModelRenderer {
         this._updateReceiveShadow();
         this._updateShadowBias();
         this._updateShadowNormalBias();
+        this._updateBakeToProbe();
     }
 
     public onEnable () {
@@ -392,6 +394,7 @@ export class MeshRenderer extends ModelRenderer {
         this._updateReceiveShadow();
         this._updateShadowBias();
         this._updateShadowNormalBias();
+        this._updateBakeToProbe();
         this._onUpdateLocalShadowBias();
         this._attachToScene();
     }
@@ -703,6 +706,12 @@ export class MeshRenderer extends ModelRenderer {
             }
         }
         return false;
+    }
+
+    protected _updateBakeToProbe () {
+        if (!this._model) { return; }
+        this._model.bakeToProbe = this._bakeToProbe;
+        console.log(`_updateBakeToProbe=============${this._bakeToProbe}`);
     }
 
     private _watchMorphInMesh () {

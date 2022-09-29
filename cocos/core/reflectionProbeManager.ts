@@ -22,6 +22,8 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+import { MeshRenderer } from '../3d/framework/mesh-renderer';
+import { Vec3 } from './math/vec3';
 import { IRenderObject } from './pipeline/define';
 import { Camera } from './renderer/scene/camera';
 import { ReflectionProbe } from './renderer/scene/reflectionProbe';
@@ -52,9 +54,8 @@ export class ReflectionProbeManager {
     }
     public getProbeByCamera (camera:Camera) {
         for (let i = 0; i < this._probes.length; i++) {
-            const probe = this._probes[i];
-            if (probe.camera === camera) {
-                return probe;
+            if (this._probes[i].camera === camera) {
+                return this._probes[i];
             }
         }
         return null;
@@ -62,9 +63,7 @@ export class ReflectionProbeManager {
     public addRenderObject (camera: Camera, obj: IRenderObject) {
         const probe = this.getProbeByCamera(camera);
         if (probe) {
-            if (obj.model.bakeToProbe) {
-                probe.renderObjects.push(obj);
-            }
+            probe.renderObjects.push(obj);
         }
     }
     public clearRenderObject (camera: Camera) {
@@ -79,6 +78,68 @@ export class ReflectionProbeManager {
             return probe.renderObjects;
         }
         return [];
+    }
+    /**
+     * @en
+     * Choose which probe to use.
+     * @zh
+     * 选择使用的probe。
+     */
+    public selectProbe (object: IRenderObject) {
+        if (this._probes.length === 0) {
+            return;
+        }
+        if (this._probes.length === 1) {
+            this._probes[0].usedObjects.push(object);
+        }
+        if (object.model.transform === null) {
+            return;
+        }
+        let distance = Vec3.distance(object.model.transform.position, this._probes[0].node.position);
+        let idx = 1;
+        for (let i = 1; i < this._probes.length; i++) {
+            const d = Vec3.distance(object.model.transform.position, this._probes[i].node.position);
+            if (d < distance) {
+                distance = d;
+                idx = i;
+            }
+        }
+        this._probes[idx].usedObjects.push(object);
+    }
+
+    /**
+     * @en
+     * The model's material binding probe's cubemap.
+     * @zh
+     * 模型的材质绑定probe的cubemap
+     * @param object objects that require a probe
+     */
+    public bindingTexture (object: IRenderObject) {
+        const probe = this.getUsedProbe(object);
+        if (probe === null) {
+            console.error('no probe is used');
+        }
+        const model = object.model;
+        if (model.node === null) {
+            return;
+        }
+        const meshRender = model.node.getComponent(MeshRenderer);
+        const materials = meshRender?.materials;
+
+        for (let i = 0; i < materials!.length; i++) {
+            const mat = materials![i];
+            mat?.setProperty('reflectionProbeMap', probe!.cubeMap, 0);
+        }
+    }
+
+    public getUsedProbe (object: IRenderObject): ReflectionProbe | null {
+        for (let i = 1; i < this._probes.length; i++) {
+            const obj = this._probes[i].usedObjects.find((v) => v === object);
+            if (obj) {
+                return this._probes[i];
+            }
+        }
+        return null;
     }
 }
 

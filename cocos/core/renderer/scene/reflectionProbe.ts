@@ -23,17 +23,18 @@
  THE SOFTWARE.
  */
 import { EDITOR } from 'internal:constants';
-import { CCBoolean, CCFloat, Color, Enum, Layers, Material, Quat, Rect, ReflectionProbeManager, Root, toRadian, Vec3 } from '../..';
-import { IRenderTextureCreateInfo, RenderTexture } from '../../assets/render-texture';
+import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, ReflectionProbeManager, Root, TextureCube, toRadian, Vec3 } from '../..';
+import { BoxCollider } from '../../../physics/framework/components/colliders/box-collider';
+import { absolute } from '../../../physics/utils/util';
+import { RenderTexture } from '../../assets/render-texture';
 import { Component } from '../../components/component';
 import { property } from '../../data/class-decorator';
 import { ccclass, executeInEditMode, menu, playOnFocus, readOnly, serializable, tooltip, type, visible } from '../../data/decorators';
 import { Director, director } from '../../director';
-import { deviceManager, Framebuffer } from '../../gfx';
+import { deviceManager } from '../../gfx';
 import { BufferTextureCopy, ClearFlagBit, ColorAttachment, DepthStencilAttachment, Format, RenderPassInfo } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK, IRenderObject } from '../../pipeline/define';
-import { IRenderWindowInfo } from '../core/render-window';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
 
 export const ProbeResolution = Enum({
@@ -126,13 +127,32 @@ export class ReflectionProbe extends Component {
     protected _fov = 90;
 
     @serializable
-    protected _cubeFilePath = '';
+    protected _cubeMap: TextureCube | null = null;
+
+    @serializable
+    protected _center = new Vec3(1, 1, 1);
+
+    @serializable
+    protected _size: Vec3 = new Vec3(1, 1, 1);
+
+    // @property(Material)
+    // material: Material | null = null;
 
     public static probeFaceIndex = ProbeFaceIndex;
     public static probeId = 0;
 
     public bakedTextures: RenderTexture[] = [];
+
+    /**
+     * @en objects in box range
+     * @zh box范围内的物体
+     */
     public renderObjects: IRenderObject[] = [];
+    /**
+     * @en Objects that use this probe
+     * @zh 使用该probe的物体
+     */
+    public usedObjects: IRenderObject[] = [];
 
     private _camera: Camera | null = null;
     private _probeId = ReflectionProbe.probeId;
@@ -260,6 +280,41 @@ export class ReflectionProbe extends Component {
         return this._far;
     }
 
+    /**
+     * @en
+     * Gets or sets the center of the collider, in local space.
+     * @zh
+     * 在本地空间中，获取box的中心点。
+     */
+    @type(Vec3)
+    @property({ group: { name: 'Box' } })
+    public set center (value: Vec3) {
+        Vec3.copy(this._center, value);
+        const collider = this.getComponent(BoxCollider);
+        collider!.center = this._center;
+    }
+    public get center () {
+        return this._center;
+    }
+
+    /**
+     * @en
+     * Gets or sets the size of the box, in local space.
+     * @zh
+     * 获取或设置盒的大小。
+     */
+    @type(Vec3)
+    @property({ group: { name: 'Box' } })
+    set size (value) {
+        Vec3.copy(this._size, value);
+        absolute(this._size);
+        const collider = this.getComponent(BoxCollider);
+        collider!.size = this._size;
+    }
+    get size () {
+        return this._size;
+    }
+
     get camera () {
         return this._camera;
     }
@@ -267,16 +322,22 @@ export class ReflectionProbe extends Component {
         return this._needRefresh;
     }
 
+    get cubeMap () {
+        return this._cubeMap;
+    }
+
     public onLoad () {
         this._probeId = ReflectionProbe.probeId++;
         ReflectionProbeManager.probeManager.register(this);
         this._createCamera();
+        this._originRotation = this.node.getRotation();
     }
 
     public onEnable () {
     }
 
     public start () {
+        //wait for the scene data init
         if (this.bakedTextures.length === 0) {
             for (let i = 0; i < 6; i++) {
                 const renderTexture = this._createTargetTexture();
@@ -284,9 +345,6 @@ export class ReflectionProbe extends Component {
             }
             this.setTargetTexture(this.bakedTextures[0]);
         }
-        this._originRotation = this.node.getRotation();
-
-        console.log(`start === ${this._cubeFilePath}`);
     }
 
     public onDestroy () {
@@ -325,8 +383,8 @@ export class ReflectionProbe extends Component {
             }
         }
         //use the tool to generate a cubemap and save to asset directory
-        await EditorExtends.Asset.bakeReflectionProbe(files, isHDR, this._probeId, (path:string) => {
-            this._cubeFilePath = path;
+        await EditorExtends.Asset.bakeReflectionProbe(files, isHDR, this._probeId, (assert: any) => {
+            this._cubeMap = assert;
         });
     }
     public async renderProbe () {

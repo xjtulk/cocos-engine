@@ -34,6 +34,7 @@ import { Model } from '../renderer/scene/model';
 import { Camera } from '../renderer/scene';
 import { PipelineRuntime } from './custom/pipeline';
 import { ReflectionProbeManager } from '../reflectionProbeManager';
+import { reflectionProbeCulling } from './scene-culling';
 
 const _phaseID = getPhaseID('default');
 const _phaseReflectMapID = getPhaseID('reflect-map');
@@ -73,6 +74,8 @@ export class RenderReflectionProbeQueue {
 
     public gatherRenderObjects (camera: Camera) {
         this.clear();
+        const sceneData = this._pipeline.pipelineSceneData;
+        reflectionProbeCulling(sceneData, camera);
         const renderObjects = ReflectionProbeManager.probeManager.getRenderObjects(camera);
         if (renderObjects === undefined) {
             return;
@@ -80,6 +83,8 @@ export class RenderReflectionProbeQueue {
         for (let i = 0; i < renderObjects.length; i++) {
             const ro = renderObjects[i];
             const model = ro.model;
+            // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+            console.log(model.bakeToProbe);
             this.add(model);
         }
     }

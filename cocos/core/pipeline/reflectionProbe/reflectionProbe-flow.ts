@@ -22,24 +22,14 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-
-import { supportsR32FloatTexture, UBOCamera, UBOCSM, UBOGlobal, UBOShadow } from '../define';
 import { IRenderFlowInfo, RenderFlow } from '../render-flow';
-import { ForwardFlowPriority } from '../enum';
 import { ReflectionProbeStage } from './reflectionProbe-stage';
-import { RenderPass, LoadOp, StoreOp,
-    Format, Texture, TextureType, TextureUsageBit, ColorAttachment,
-    DepthStencilAttachment, RenderPassInfo, TextureInfo, FramebufferInfo, Swapchain,
-    Framebuffer, DescriptorSet, API, GeneralBarrierInfo, AccessFlagBit } from '../../gfx';
 import { RenderFlowTag } from '../pipeline-serialization';
-import { ForwardPipeline } from '../forward/forward-pipeline';
 import { RenderPipeline } from '..';
-import { Light } from '../../renderer/scene/light';
 import { Camera, CameraType } from '../../renderer/scene';
 import { ccclass } from '../../data/decorators';
 import { ReflectionProbeManager } from '../../reflectionProbeManager';
-import { ProbeType, ReflectionProbe } from '../../renderer/scene/reflectionProbe';
-import { RenderTexture } from '../..';
+import { ReflectionProbe } from '../../renderer/scene/reflectionProbe';
 
 /**
  * @en ReflectionProbe render flow
@@ -79,6 +69,11 @@ export class ReflectionProbeFlow extends RenderFlow {
             const probe = probes[i];
             if (probe.needRefresh) {
                 this._renderStage(probe);
+                const renderObjects = this._pipeline.pipelineSceneData.renderObjects;
+                for (let i = 0; i < renderObjects.length; i++) {
+                    ReflectionProbeManager.probeManager.selectProbe(renderObjects[i]);
+                    ReflectionProbeManager.probeManager.bindingTexture(renderObjects[i]);
+                }
                 console.log(`render probe id = ${probe.getProbeId()}`);
                 break;
             }
