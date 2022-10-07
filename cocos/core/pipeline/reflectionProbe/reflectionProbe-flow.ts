@@ -72,7 +72,7 @@ export class ReflectionProbeFlow extends RenderFlow {
                 const renderObjects = this._pipeline.pipelineSceneData.renderObjects;
                 for (let i = 0; i < renderObjects.length; i++) {
                     ReflectionProbeManager.probeManager.selectProbe(renderObjects[i]);
-                    ReflectionProbeManager.probeManager.bindingTexture(renderObjects[i]);
+                    //ReflectionProbeManager.probeManager.bindingTexture(renderObjects[i]);
                 }
                 console.log(`render probe id = ${probe.getProbeId()}`);
                 break;

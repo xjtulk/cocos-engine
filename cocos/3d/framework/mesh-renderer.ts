@@ -312,7 +312,7 @@ export class MeshRenderer extends ModelRenderer {
 
     set bakeToProbe (val) {
         this._bakeToProbe = val;
-        this._model!.bakeToProbe = val;
+        this._updateBakeToProbe();
     }
 
     /**
@@ -711,7 +711,6 @@ export class MeshRenderer extends ModelRenderer {
     protected _updateBakeToProbe () {
         if (!this._model) { return; }
         this._model.bakeToProbe = this._bakeToProbe;
-        console.log(`_updateBakeToProbe=============${this._bakeToProbe}`);
     }
 
     private _watchMorphInMesh () {

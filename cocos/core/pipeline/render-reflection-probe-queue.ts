@@ -83,8 +83,6 @@ export class RenderReflectionProbeQueue {
         for (let i = 0; i < renderObjects.length; i++) {
             const ro = renderObjects[i];
             const model = ro.model;
-            // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
-            console.log(model.bakeToProbe);
             this.add(model);
         }
     }

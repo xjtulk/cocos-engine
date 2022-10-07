@@ -91,6 +91,7 @@ export class ReflectionProbeManager {
         }
         if (this._probes.length === 1) {
             this._probes[0].usedObjects.push(object);
+            return;
         }
         if (object.model.transform === null) {
             return;
