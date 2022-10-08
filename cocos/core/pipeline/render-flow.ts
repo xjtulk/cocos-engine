@@ -27,7 +27,7 @@ import { ccclass, displayOrder, serializable, type } from 'cc.decorator';
 import { RenderStage } from './render-stage';
 import { RenderPipeline } from './render-pipeline';
 import { legacyCC } from '../global-exports';
-import { Camera } from '../renderer/scene';
+import { Camera, CameraType } from '../renderer/scene';
 
 /**
  * @en Render flow information descriptor
@@ -138,6 +138,7 @@ export abstract class RenderFlow {
      * @param view Render view。
      */
     public render (camera: Camera) {
+        if (camera.cameraType === CameraType.REFLECTION_PROBE) return;
         for (let i = 0, len = this._stages.length; i < len; i++) {
             if (this._stages[i].enabled) this._stages[i].render(camera);
         }

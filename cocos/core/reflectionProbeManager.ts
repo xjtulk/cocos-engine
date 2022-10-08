@@ -22,7 +22,6 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
-import { MeshRenderer } from '../3d/framework/mesh-renderer';
 import { Vec3 } from './math/vec3';
 import { IRenderObject } from './pipeline/define';
 import { Camera } from './renderer/scene/camera';
@@ -86,18 +85,20 @@ export class ReflectionProbeManager {
      * 选择使用的probe。
      */
     public selectProbe (object: IRenderObject) {
+        if (object.model.transform === null) {
+            return;
+        }
         if (this._probes.length === 0) {
             return;
         }
         if (this._probes.length === 1) {
             this._probes[0].usedObjects.push(object);
+            console.log(this._probes[0].usedObjects[0].model.node.name);
             return;
         }
-        if (object.model.transform === null) {
-            return;
-        }
+        //select the nearest
         let distance = Vec3.distance(object.model.transform.position, this._probes[0].node.position);
-        let idx = 1;
+        let idx = 0;
         for (let i = 1; i < this._probes.length; i++) {
             const d = Vec3.distance(object.model.transform.position, this._probes[i].node.position);
             if (d < distance) {
@@ -106,31 +107,7 @@ export class ReflectionProbeManager {
             }
         }
         this._probes[idx].usedObjects.push(object);
-    }
-
-    /**
-     * @en
-     * The model's material binding probe's cubemap.
-     * @zh
-     * 模型的材质绑定probe的cubemap
-     * @param object objects that require a probe
-     */
-    public bindingTexture (object: IRenderObject) {
-        const probe = this.getUsedProbe(object);
-        if (probe === null) {
-            console.error('no probe is used');
-        }
-        const model = object.model;
-        if (model.node === null) {
-            return;
-        }
-        const meshRender = model.node.getComponent(MeshRenderer);
-        const materials = meshRender?.materials;
-
-        for (let i = 0; i < materials!.length; i++) {
-            const mat = materials![i];
-            mat?.setProperty('reflectionProbeMap', probe!.cubeMap, 0);
-        }
+        console.log(this._probes[idx].usedObjects[0].model.node.name);
     }
 
     public getUsedProbe (object: IRenderObject): ReflectionProbe | null {

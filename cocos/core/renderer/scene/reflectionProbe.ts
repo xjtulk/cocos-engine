@@ -24,6 +24,7 @@
  */
 import { EDITOR } from 'internal:constants';
 import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, ReflectionProbeManager, Root, TextureCube, toRadian, Vec3 } from '../..';
+import { MeshRenderer } from '../../../3d/framework/mesh-renderer';
 import { BoxCollider } from '../../../physics/framework/components/colliders/box-collider';
 import { absolute } from '../../../physics/utils/util';
 import { RenderTexture } from '../../assets/render-texture';
@@ -224,6 +225,7 @@ export class ReflectionProbe extends Component {
     @type(Color)
     set backgroundColor (val: Color) {
         this._backgroundColor = val;
+        this._camera!.clearColor = this._backgroundColor;
     }
     get backgroundColor () {
         return this._backgroundColor;
@@ -239,6 +241,7 @@ export class ReflectionProbe extends Component {
     }
     set visibility (val) {
         this._visibility = val;
+        this._camera!.visibility = this._visibility;
     }
 
     /**
@@ -330,7 +333,6 @@ export class ReflectionProbe extends Component {
         this._probeId = ReflectionProbe.probeId++;
         ReflectionProbeManager.probeManager.register(this);
         this._createCamera();
-        this._originRotation = this.node.getRotation();
     }
 
     public onEnable () {
@@ -386,14 +388,17 @@ export class ReflectionProbe extends Component {
         await EditorExtends.Asset.bakeReflectionProbe(files, isHDR, this._probeId, (assert: any) => {
             this._cubeMap = assert;
         });
+        this.bindingTexture();
     }
-    public async renderProbe () {
+    private async renderProbe () {
+        this.usedObjects = [];
+        this.renderObjects = [];
+        this._originRotation = this.node.getRotation();
         this._attachCameraToScene();
         this._needRefresh = true;
         await this.waitForNextFrame();
-        this._detachCameraFromScene();
         this._needRefresh = false;
-        //reset rotation
+        this._detachCameraFromScene();
         this.node.setRotation(this._originRotation);
     }
 
@@ -553,5 +558,36 @@ export class ReflectionProbe extends Component {
 
     public isFinishedRendering () {
         return true;
+    }
+
+    /**
+     * @en
+     * The model's material binding probe's cubemap.
+     * @zh
+     * 模型的材质绑定probe的cubemap
+     */
+    public bindingTexture () {
+        console.log(`bindingTexture=======${this.usedObjects.length}`);
+        console.log(this.usedObjects[0].model.node.name);
+        for (let i = 0; i < this.usedObjects.length; i++) {
+            const object = this.usedObjects[i];
+            const model = object.model;
+            if (model.node === null) {
+                //continue;
+            }
+            console.log(model.node.name);
+            const meshRender = model.node.getComponent(MeshRenderer);
+            const materials = meshRender?.materials;
+            for (let j = 0; j < materials!.length; j++) {
+                const mat = materials![j];
+                mat?.setProperty('reflectionProbeMap', this.cubeMap, 0);
+                const pass = mat?.passes[0];
+                console.log(pass);
+                console.log(mat?.effectName);
+            }
+        }
+    }
+    public validate () {
+        return this.cubeMap !== null;
     }
 }

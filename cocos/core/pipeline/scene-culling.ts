@@ -199,7 +199,6 @@ export function reflectionProbeCulling (sceneData: PipelineSceneData, camera: Ca
             if (model.node && ((visibility & model.node.layer) === model.node.layer)
                   || (visibility & model.visFlags)) {
                 if (model.bakeToProbe) {
-                    // frustum culling
                     ReflectionProbeManager.probeManager.addRenderObject(camera, getRenderObject(model, camera));
                 }
             }
