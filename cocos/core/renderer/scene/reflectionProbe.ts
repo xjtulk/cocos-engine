@@ -152,10 +152,10 @@ export class ReflectionProbe extends Component {
      */
     public renderObjects: IRenderObject[] = [];
     /**
-     * @en Objects that use this probe
-     * @zh 使用该probe的物体
+     * @en material that use this probe
+     * @zh 使用该probe的材质
      */
-    public usedMateria: MaterialInstance[] = [];
+    private usedMateria: MaterialInstance[] = [];
 
     private _camera: Camera | null = null;
     private _probeId = ReflectionProbe.probeId;
@@ -390,7 +390,7 @@ export class ReflectionProbe extends Component {
         await EditorExtends.Asset.bakeReflectionProbe(files, isHDR, this._probeId, (assert: any) => {
             this._cubeMap = assert;
         });
-        this.bindingTexture();
+        ReflectionProbeManager.probeManager.bindingCubeMap();
     }
     private async renderProbe () {
         this.usedMateria = [];
@@ -572,11 +572,17 @@ export class ReflectionProbe extends Component {
         for (let j = 0; j < this.usedMateria.length; j++) {
             const mat = this.usedMateria[j];
             mat?.setProperty('reflectionProbeMap', this.cubeMap, 0);
-            const pass = mat?.passes[0];
-            console.log(mat?.effectName);
         }
     }
     public validate () {
         return this.cubeMap !== null;
+    }
+    public addUsedMaterial (mat:MaterialInstance) {
+        if (this.usedMateria.indexOf(mat) === -1) {
+            this.usedMateria.push(mat);
+        }
+    }
+    public getUsedMateria () {
+        return this.usedMateria;
     }
 }

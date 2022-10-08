@@ -111,8 +111,19 @@ export class ReflectionProbeManager {
         if (model.node !== null) {
             const meshRender = model.node.getComponent(MeshRenderer);
             meshRender?.materials.forEach((mat) => {
-                this._probes[idx].usedMateria.push(mat!);
+                this._probes[idx].addUsedMaterial(mat!);
             });
+        }
+    }
+
+    public bindingCubeMap () {
+        for (let i = 0; i < this._probes.length; i++) {
+            const probe = this._probes[i];
+            const usedMateria = probe.getUsedMateria();
+            for (let j = 0; j < usedMateria.length; j++) {
+                const mat = usedMateria[j];
+                mat?.setProperty('reflectionProbeMap', probe.cubeMap, 0);
+            }
         }
     }
 
