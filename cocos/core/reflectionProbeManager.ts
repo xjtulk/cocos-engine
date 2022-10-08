@@ -22,6 +22,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+import { MeshRenderer } from '../3d/framework/mesh-renderer';
 import { Vec3 } from './math/vec3';
 import { IRenderObject } from './pipeline/define';
 import { Camera } from './renderer/scene/camera';
@@ -31,6 +32,7 @@ export class ReflectionProbeManager {
     public static probeManager: ReflectionProbeManager;
 
     private _probes: ReflectionProbe[] = [];
+
     public register (probe: ReflectionProbe) {
         const index = this._probes.indexOf(probe);
         if (index === -1) {
@@ -91,34 +93,38 @@ export class ReflectionProbeManager {
         if (this._probes.length === 0) {
             return;
         }
-        if (this._probes.length === 1) {
-            this._probes[0].usedObjects.push(object);
-            console.log(this._probes[0].usedObjects[0].model.node.name);
-            return;
-        }
         //select the nearest
         let distance = Vec3.distance(object.model.transform.position, this._probes[0].node.position);
         let idx = 0;
         for (let i = 1; i < this._probes.length; i++) {
+            if (!this._probes[i].validate()) {
+                continue;
+            }
             const d = Vec3.distance(object.model.transform.position, this._probes[i].node.position);
             if (d < distance) {
                 distance = d;
                 idx = i;
             }
         }
-        this._probes[idx].usedObjects.push(object);
-        console.log(this._probes[idx].usedObjects[0].model.node.name);
+        console.log(`use probe id = ${idx}`);
+        const model = object.model;
+        if (model.node !== null) {
+            const meshRender = model.node.getComponent(MeshRenderer);
+            meshRender?.materials.forEach((mat) => {
+                this._probes[idx].usedMateria.push(mat!);
+            });
+        }
     }
 
-    public getUsedProbe (object: IRenderObject): ReflectionProbe | null {
-        for (let i = 1; i < this._probes.length; i++) {
-            const obj = this._probes[i].usedObjects.find((v) => v === object);
-            if (obj) {
-                return this._probes[i];
-            }
-        }
-        return null;
-    }
+    // public getUsedProbe (object: IRenderObject): ReflectionProbe | null {
+    //     for (let i = 1; i < this._probes.length; i++) {
+    //         const obj = this._probes[i].usedObjects.find((v) => v === object);
+    //         if (obj) {
+    //             return this._probes[i];
+    //         }
+    //     }
+    //     return null;
+    // }
 }
 
 ReflectionProbeManager.probeManager = new ReflectionProbeManager();

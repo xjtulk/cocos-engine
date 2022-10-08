@@ -22,6 +22,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+import { Material } from '@cocos/cannon';
 import { EDITOR } from 'internal:constants';
 import { CCBoolean, CCFloat, Color, Enum, Layers, Quat, Rect, ReflectionProbeManager, Root, TextureCube, toRadian, Vec3 } from '../..';
 import { MeshRenderer } from '../../../3d/framework/mesh-renderer';
@@ -36,6 +37,7 @@ import { deviceManager } from '../../gfx';
 import { BufferTextureCopy, ClearFlagBit, ColorAttachment, DepthStencilAttachment, Format, RenderPassInfo } from '../../gfx/base/define';
 import { legacyCC } from '../../global-exports';
 import { CAMERA_DEFAULT_MASK, IRenderObject } from '../../pipeline/define';
+import { MaterialInstance } from '../core/material-instance';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
 
 export const ProbeResolution = Enum({
@@ -153,7 +155,7 @@ export class ReflectionProbe extends Component {
      * @en Objects that use this probe
      * @zh 使用该probe的物体
      */
-    public usedObjects: IRenderObject[] = [];
+    public usedMateria: MaterialInstance[] = [];
 
     private _camera: Camera | null = null;
     private _probeId = ReflectionProbe.probeId;
@@ -391,7 +393,7 @@ export class ReflectionProbe extends Component {
         this.bindingTexture();
     }
     private async renderProbe () {
-        this.usedObjects = [];
+        this.usedMateria = [];
         this.renderObjects = [];
         this._originRotation = this.node.getRotation();
         this._attachCameraToScene();
@@ -567,24 +569,11 @@ export class ReflectionProbe extends Component {
      * 模型的材质绑定probe的cubemap
      */
     public bindingTexture () {
-        console.log(`bindingTexture=======${this.usedObjects.length}`);
-        console.log(this.usedObjects[0].model.node.name);
-        for (let i = 0; i < this.usedObjects.length; i++) {
-            const object = this.usedObjects[i];
-            const model = object.model;
-            if (model.node === null) {
-                //continue;
-            }
-            console.log(model.node.name);
-            const meshRender = model.node.getComponent(MeshRenderer);
-            const materials = meshRender?.materials;
-            for (let j = 0; j < materials!.length; j++) {
-                const mat = materials![j];
-                mat?.setProperty('reflectionProbeMap', this.cubeMap, 0);
-                const pass = mat?.passes[0];
-                console.log(pass);
-                console.log(mat?.effectName);
-            }
+        for (let j = 0; j < this.usedMateria.length; j++) {
+            const mat = this.usedMateria[j];
+            mat?.setProperty('reflectionProbeMap', this.cubeMap, 0);
+            const pass = mat?.passes[0];
+            console.log(mat?.effectName);
         }
     }
     public validate () {
