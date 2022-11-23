@@ -256,6 +256,9 @@ int32_t Engine::restartVM() {
     cc::EventDispatcher::destroy();
     // remove all listening events
     offAll();
+    //clean file cache
+    FileUtils::destroyInstance();
+
     // start
     cc::EventDispatcher::init();
     CC_CURRENT_APPLICATION()->init();
@@ -336,6 +339,9 @@ bool Engine::dispatchWindowEvent(const WindowEvent& ev) {
     } else if (ev.type == WindowEvent::Type::QUIT) {
         // There is no need to process the quit message,
         // the quit message is a custom message for the application
+        isHandled = true;
+    } else if (ev.type == WindowEvent::Type::RESTART) {
+        restart();
         isHandled = true;
     }
     return isHandled;

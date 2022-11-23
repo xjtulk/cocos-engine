@@ -46,3 +46,4 @@ extern void        flushTasksOnGameThreadAtForegroundJNI();
 extern void        setAccelerometerEnabledJNI(bool isEnabled);
 extern void        setAccelerometerIntervalJNI(float interval);
 extern float *     getDeviceMotionValueJNI();
+extern void        reportScriptException(const std::string &location, const std::string &message, const std::string &stack);

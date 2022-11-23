@@ -35,6 +35,7 @@
 #include "cocos/bindings/manual/jsb_module_register.h"
 #include "cocos/engine/BaseEngine.h"
 #include "cocos/platform/interfaces/modules/IScreen.h"
+#include "platform/java/jni/JniImp.h"
 
 namespace cc {
 
@@ -138,6 +139,7 @@ void CocosApplication::runScript(const std::string &filePath) {
 void CocosApplication::handleException(const char *location, const char *message, const char *stack) {
     // Send exception information to server like Tencent Bugly.
     CC_LOG_ERROR("\nUncaught Exception:\n - location :  %s\n - msg : %s\n - detail : \n      %s\n", location, message, stack);
+    reportScriptException(location, message, stack);
 }
 
 void CocosApplication::setXXTeaKey(const std::string &key) {

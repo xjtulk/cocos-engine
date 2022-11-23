@@ -188,6 +188,14 @@ void JniNativeGlue::onLowMemory() {
     writeCommandAsync(JniCommand::JNI_CMD_LOW_MEMORY);
 }
 
+void JniNativeGlue::exitEngine() {
+    writeCommandAsync(JniCommand::JNI_CMD_DESTROY);
+}
+
+void JniNativeGlue::restartEngine() {
+    writeCommandAsync(JniCommand::JNI_CMD_RESTART);
+}
+
 void JniNativeGlue::execCommand() {
     static CommandMsg msg;
     static bool       runInLowRate{false};
@@ -269,6 +277,11 @@ void JniNativeGlue::engineHandleCmd(JniCommand cmd) {
             ev.type = DeviceEvent::Type::DEVICE_MEMORY;
             dispatchEvent(ev);
             break;
+        }
+        case JniCommand::JNI_CMD_RESTART: {
+            WindowEvent ev;
+            ev.type = WindowEvent::Type::RESTART;
+            dispatchEvent(ev);
         }
         default:
             break;

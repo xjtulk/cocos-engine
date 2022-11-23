@@ -81,6 +81,7 @@ public:
         HIDDEN,
         MINIMIZED,
         CLOSE,
+        RESTART,
         UNKNOWN,
     };
     Type type   = Type::UNKNOWN;

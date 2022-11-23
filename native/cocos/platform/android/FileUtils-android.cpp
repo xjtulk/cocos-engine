@@ -82,7 +82,7 @@ FileUtilsAndroid::~FileUtilsAndroid() {
 }
 
 bool FileUtilsAndroid::init() {
-    _defaultResRootPath = ASSETS_FOLDER_NAME;
+    _defaultResRootPath = JniHelper::callStaticStringMethod(JCLS_HELPER, "getResPath");
 
     std::string assetsPath(getObbFilePathJNI());
     if (assetsPath.find("/obb/") != std::string::npos) {

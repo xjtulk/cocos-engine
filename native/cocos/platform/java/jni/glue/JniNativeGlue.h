@@ -64,6 +64,7 @@ public:
         JNI_CMD_PAUSE,
         JNI_CMD_DESTROY,
         JNI_CMD_LOW_MEMORY,
+        JNI_CMD_RESTART,
         JNI_CMD_UNKNOW,
     };
     virtual ~JniNativeGlue();
@@ -111,6 +112,10 @@ public:
     void onPause();
     void onResume();
     void onLowMemory();
+
+    void exitEngine();
+
+    void restartEngine();
 
     bool isPause() const;
 

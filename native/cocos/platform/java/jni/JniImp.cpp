@@ -140,3 +140,7 @@ void setAccelerometerIntervalJNI(float interval) {
 float *getDeviceMotionValueJNI() {
     return JniHelper::callStaticFloatArrayMethod(JCLS_SENSOR, "getDeviceMotionValue");
 }
+
+void reportScriptException(const std::string &location, const std::string &message, const std::string &stack) {
+    JniHelper::callStaticVoidMethod(JCLS_HELPER, "reportScriptException", location, message, stack);
+}
